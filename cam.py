@@ -117,8 +117,9 @@ def main():
                         camera.capture(output, 'yuv', use_video_port=False)
 
                         pictures_to_average = pictures_to_average + output.get_data() // args.average
-                    except picamera.exc.PiCameraRuntimeError:
+                    except picamera.exc.PiCameraRuntimeError as error:
                         print("Error 1 on frame %d" % i)
+                        print(error)
                     except RuntimeError:
                         print("Error 2 on frame %d" % i)
 
