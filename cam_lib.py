@@ -86,6 +86,7 @@ def print_args(args):
         print("Shutter speed set automatically")
 
     print(args.compress)
+    print("Starting at frame %d" % args.start_frame)
 
     print("\n")
 

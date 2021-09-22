@@ -35,16 +35,19 @@ parser.add_argument("-q", "--quality", help="set jpeg quality <0 to 100>",
 parser.add_argument("-iso", "--iso", help="sets the apparent ISO setting of the camera",
                     nargs='?', type=int, default=100)
 parser.add_argument("-ss", "--shutter-speed", help="sets the shutter speed of the camera in microseconds",
-                    nargs='?', type=int, const=0)
+                    type=int, default=0)
 parser.add_argument("-x", "--compress", help="",
                     nargs='?', type=int, const=1000)
+parser.add_argument("-sf", "--start-frame", help="input the frame number to start to (default = 0)",
+                    type=int, default=0)
 
 args = parser.parse_args()
 
 
 local_tmp_dir = ".campy_local_save/"
-absolute_output_folder = pathlib.Path(cl.get_folder_name(args.output[0])).absolute()
-output_filename = cl.get_file_name(args.output[0])
+if args.output is not None:
+    absolute_output_folder = pathlib.Path(cl.get_folder_name(args.output[0])).absolute()
+    output_filename = cl.get_file_name(args.output[0])
 
 # print(absolute_output_folder)
 # print(output_filename)
@@ -102,7 +105,7 @@ def main():
                 print("Camera successfully started")
                 print("Current a/d gains: {}, {}".format(camera.analog_gain, camera.digital_gain))
 
-            for k in range(n_frames_total):
+            for k in range(args.start_frame, n_frames_total):
                 start_time = time.time()
                 pictures_to_average = np.empty((2464, 3296), dtype=np.uint8)
 
@@ -114,14 +117,15 @@ def main():
                 for i in range(nPicsPerFrames):
                     output = npi.NPImage()
                     try:
+
                         camera.capture(output, 'yuv', use_video_port=False)
 
                         pictures_to_average = pictures_to_average + output.get_data() // args.average
                     except picamera.exc.PiCameraRuntimeError as error:
-                        print("Error 1 on frame %d" % i)
+                        print("Error 1 on frame %d" % k)
                         print(error)
                     except RuntimeError:
-                        print("Error 2 on frame %d" % i)
+                        print("Error 2 on frame %d" % k)
 
                 if args.output is not None:
                     cl.save_image(pictures_to_average, k, absolute_output_folder,
