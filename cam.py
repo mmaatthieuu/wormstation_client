@@ -85,6 +85,7 @@ def main():
         delay = 0
         with picamera.PiCamera(resolution='3296x2464') as camera:
             camera.iso = args.iso
+            #camera.CAPTURE_TIMEOUT = 10
 
             if args.preview:
                 camera.start_preview()
@@ -146,7 +147,7 @@ def main():
                 else:
                     delay -= diff_time
                     if args.verbose:
-                        print('Frame %fs late' % -diff_time)
+                        print('\nFrame %fs late' % -diff_time)
                         print('Delay : %fs' % delay)
     except KeyboardInterrupt:
         print("\nScript interrupted by user")

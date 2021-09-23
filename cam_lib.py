@@ -103,6 +103,6 @@ def compress(folder_name, dest_path):
     except OSError:
         print("Failed to move and/or delete folder")
 
-    print("Compression of %s done" % folder_name)
+    print("\nCompression of %s done" % folder_name)
 
 
