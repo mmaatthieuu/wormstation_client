@@ -110,6 +110,7 @@ def compressor(x, ratio, threshold):
     y1 = np.copy(x)
     y2 = np.copy(x)
     y1[y1>=threshold] = 0
-    y2[y2<threshold] = 0
+    #y2[y2<threshold] = 0
     y2 = np.array(ratio * y2 + threshold * (1 - ratio), dtype=np.uint8)
+    y2[y1<threshold]=0
     return y1+y2
