@@ -39,7 +39,7 @@ def save_image(picture_array, k, output_folder, output_filename, compress_step, 
 
     else:
         part = k // compress_step
-        current_dir = "part%d/" % part
+        current_dir = "part%02d/" % part
 
         if k % compress_step == 0:
             try:
@@ -106,3 +106,10 @@ def compress(folder_name, dest_path):
     print("\nCompression of %s done" % folder_name)
 
 
+def compressor(x, ratio, threshold):
+    y1 = np.copy(x)
+    y2 = np.copy(x)
+    y1[y1>=threshold] = 0
+    y2[y2<threshold] = 0
+    y2 = np.array(ratio * y2 + threshold * (1 - ratio), dtype=np.uint8)
+    return y1+y2

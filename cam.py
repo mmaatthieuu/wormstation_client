@@ -40,6 +40,8 @@ parser.add_argument("-x", "--compress", help="",
                     nargs='?', type=int, const=1000)
 parser.add_argument("-sf", "--start-frame", help="input the frame number to start to (default = 0)",
                     type=int, default=0)
+parser.add_argument("-r", type=float)
+parser.add_argument("-th", type=int)
 
 args = parser.parse_args()
 
@@ -71,6 +73,7 @@ def init():
             pass
             # os.remove(".campy_local_save/*")
         os.chdir(local_tmp_dir)
+
 
 
 
@@ -121,7 +124,9 @@ def main():
 
                         camera.capture(output, 'yuv', use_video_port=False)
 
-                        pictures_to_average = pictures_to_average + output.get_data() // args.average
+                        pictures_to_average = pictures_to_average + \
+                                              cl.compressor(output.get_data(),args.r,args.th) // args.average
+                        print(np.max(pictures_to_average))
                     except picamera.exc.PiCameraRuntimeError as error:
                         print("Error 1 on frame %d" % k)
                         print(error)
