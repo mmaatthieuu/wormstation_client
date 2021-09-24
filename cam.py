@@ -124,9 +124,10 @@ def main():
 
                         camera.capture(output, 'yuv', use_video_port=False)
 
-                        pictures_to_average = pictures_to_average + \
+                        #pictures_to_average = pictures_to_average + \
                                               cl.compressor(output.get_data(),args.r,args.th) // args.average
-                        print(np.max(pictures_to_average))
+                        pictures_to_average = pictures_to_average + output.get_data()// args.average
+                        #print(np.max(pictures_to_average))
                     except picamera.exc.PiCameraRuntimeError as error:
                         print("Error 1 on frame %d" % k)
                         print(error)
