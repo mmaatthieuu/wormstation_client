@@ -52,7 +52,8 @@ def save_image(picture_array, k, output_folder, output_filename, compress_step, 
 
         if k % compress_step == compress_step - 1 or k == n_frames_total - 1:
             print(threading.enumerate())
-            dir_to_compress = "part%d" % part
+            #dir_to_compress = "part%02d" % part
+            dir_to_compress = current_dir
             print("Dir_to_compress : %s" % dir_to_compress)
             print("Dest path : %s " % output_folder)
             compress_task = threading.Thread(target=compress, args=(dir_to_compress, output_folder))
