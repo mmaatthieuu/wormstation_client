@@ -124,7 +124,7 @@ def main():
                     try:
 
                         camera.capture(output, 'yuv', use_video_port=False)
-
+                        time.sleep(0.05)
                         #pictures_to_average = pictures_to_average + \
                         #                      cl.compressor(output.get_data(),args.r,args.th) // args.average
                         pictures_to_average = pictures_to_average + output.get_data()// args.average
