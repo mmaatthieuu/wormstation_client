@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 import pathlib
+import sys
 
 import numpy as np
 import time
@@ -131,6 +132,7 @@ def main():
                     except picamera.exc.PiCameraRuntimeError as error:
                         print("Error 1 on frame %d" % k)
                         print(error)
+                        sys.exit()
                     except RuntimeError:
                         print("Error 2 on frame %d" % k)
 
