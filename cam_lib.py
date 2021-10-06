@@ -39,7 +39,7 @@ def save_image(picture_array, k, output_folder, output_filename, compress_step, 
 
     else:
         part = k // compress_step
-        current_dir = "part%02d/" % part
+        current_dir = "part%02d" % part
 
         if k % compress_step == 0:
             try:
@@ -101,8 +101,9 @@ def compress(folder_name, dest_path):
     try:
         shutil.move(folder_name+".tgz", "%s/%s.tgz" % (dest_path, folder_name))
         shutil.rmtree(folder_name)
-    except OSError:
+    except OSError as error:
         print("Failed to move and/or delete folder")
+        print(error)
 
     print("\nCompression of %s done" % folder_name)
 
