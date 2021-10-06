@@ -71,26 +71,33 @@ def print_args(args):
     mins = (args.timeout - h * 3600) // 60
     s = args.timeout - h * 3600 - mins * 60
 
-    print("Verbosity turned on")
-    print("Taking frames every %ds" % args.time_interval)
-    print("Averaging %d pictures at each frame" % nPicsPerFrames)
-    print("Timeout : %ds (%dh%dmin%ds)" % (args.timeout, h, mins, s))
-    print("Capturing %d frames" % n_frames_total)
+    output_str = ""
+
+    output_str += ("Verbosity : %s\n" % args.verbose)
+    output_str += ("Time interval between frames [seconds] : %d\n" % args.time_interval)
+    output_str += ("Pictures averaged at each frame : %d\n" % nPicsPerFrames)
+    output_str += ("Timeout : %ds (%dh%dmin%ds)\n" % (args.timeout, h, mins, s))
+    output_str += ("Total number of frames : %d\n" % n_frames_total)
     if args.output is not None:
-        print("Writing file to : %s" % args.output[0])
+        output_str += ("Writing file to : %s\n" % args.output[0])
     else:
-        print("Output files NOT saved to disk")
-    print("JPG quality set to : %d" % args.quality)
-    print("ISO : %d" % args.iso)
+        output_str += ("Output files NOT saved to disk\n")
+    output_str += ("JPG quality : %d\n" % args.quality)
+    output_str += ("ISO : %d\n" % args.iso)
     if args.shutter_speed is not None:
-        print("Shutter speed : %d" % args.shutter_speed)
+        output_str += ("Shutter speed : %d\n" % args.shutter_speed)
     else:
-        print("Shutter speed set automatically")
+        output_str += ("Shutter speed set automatically\n")
 
-    print(args.compress)
-    print("Starting at frame %d" % args.start_frame)
+    if args.compress is None:
+        output_str += ("Without compression\n")
+    else:
+        output_str += ("Number of images per archive : %d\n" % args.compress)
+    output_str += ("Starting frame : %d\n" % args.start_frame)
 
-    print("\n")
+    output_str += ("\n")
+
+    return output_str
 
 
 def compress(folder_name, dest_path):

@@ -10,7 +10,7 @@ import os.path
 
 import NPImage as npi
 
-
+import datetime
 
 import cam_lib as cl
 
@@ -64,7 +64,7 @@ def init():
         args.verbose = True
 
     if args.verbose:
-        cl.print_args(args)
+        print(cl.print_args(args))
 
     if args.compress is not None:
         try:
@@ -76,11 +76,27 @@ def init():
         os.chdir(local_tmp_dir)
 
 
+def save_info(args):
 
+    x = datetime.datetime.now()
+
+    #nfo_filename = "%s.nfo" % datetime.now()
+    nfo_filename = x.strftime("%Y%m%d_%H%M.nfo")
+    print(nfo_filename)
+    if args.output is not None:
+        nfo_path = pathlib.Path.joinpath(absolute_output_folder, nfo_filename)
+    else:
+        nfo_path = pathlib.Path("./%s" % nfo_filename)
+
+    with open(nfo_path, 'w') as f:
+        f.write(cl.print_args(args))
+    return nfo_path
 
 
 def main():
     init()
+
+    nfo_path = save_info(args)
 
     nPicsPerFrames = args.average
     n_frames_total = args.timeout // args.time_interval
@@ -106,9 +122,13 @@ def main():
                 camera.shutter_speed = args.shutter_speed
                 camera.exposure_mode = 'off'
 
+            gain_str = "A/D gains: {}, {}".format(camera.analog_gain, camera.digital_gain)
+            with open(nfo_path,'a') as file:
+                file.write(gain_str + '\n')
+
             if args.verbose:
                 print("Camera successfully started")
-                print("Current a/d gains: {}, {}".format(camera.analog_gain, camera.digital_gain))
+                print(gain_str)
 
             for k in range(args.start_frame, n_frames_total):
                 start_time = time.time()
