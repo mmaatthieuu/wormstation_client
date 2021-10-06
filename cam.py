@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 import pathlib
+import sys
 
 import numpy as np
 import time
@@ -123,7 +124,7 @@ def main():
                     try:
 
                         camera.capture(output, 'yuv', use_video_port=False)
-
+                        time.sleep(0.05)
                         #pictures_to_average = pictures_to_average + \
                         #                      cl.compressor(output.get_data(),args.r,args.th) // args.average
                         pictures_to_average = pictures_to_average + output.get_data()// args.average
@@ -131,6 +132,7 @@ def main():
                     except picamera.exc.PiCameraRuntimeError as error:
                         print("Error 1 on frame %d" % k)
                         print(error)
+                        sys.exit()
                     except RuntimeError:
                         print("Error 2 on frame %d" % k)
 
