@@ -65,7 +65,10 @@ def save_image(picture_array, k, output_folder, output_filename, compress_step, 
 def print_args(args):
 
     nPicsPerFrames = args.average
-    n_frames_total = args.timeout // args.time_interval
+    try:
+        n_frames_total = args.timeout // args.time_interval
+    except ZeroDivisionError:
+        n_frames_total = 1
 
     h = args.timeout // 3600
     mins = (args.timeout - h * 3600) // 60
@@ -77,7 +80,7 @@ def print_args(args):
     output_str += ("Time interval between frames [seconds] : %d\n" % args.time_interval)
     output_str += ("Pictures averaged at each frame : %d\n" % nPicsPerFrames)
     output_str += ("Timeout : %ds (%dh%dmin%ds)\n" % (args.timeout, h, mins, s))
-    output_str += ("Total number of frames : %d\n" % n_frames_total)
+    output_str += ("Total number of frames : " + str(n_frames_total) + "\n")
     if args.output is not None:
         output_str += ("Writing file to : %s\n" % args.output[0])
     else:

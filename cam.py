@@ -41,6 +41,8 @@ parser.add_argument("-x", "--compress", help="",
                     nargs='?', type=int, const=1000)
 parser.add_argument("-sf", "--start-frame", help="input the frame number to start to (default = 0)",
                     type=int, default=0)
+parser.add_argument("-nfo", "--save-nfo", help="Save an nfo file with all recording parameters",
+                    action="store_true")
 parser.add_argument("-r", type=float)
 parser.add_argument("-th", type=int)
 
@@ -96,11 +98,14 @@ def save_info(args):
 def main():
     init()
 
-    nfo_path = save_info(args)
+    if args.save_nfo:
+        nfo_path = save_info(args)
 
     nPicsPerFrames = args.average
-    n_frames_total = args.timeout // args.time_interval
-
+    try:
+        n_frames_total = args.timeout // args.time_interval
+    except ZeroDivisionError:
+        n_frames_total = 1
     try:
         delay = 0
         with picamera.PiCamera(resolution='3296x2464') as camera:
@@ -123,8 +128,9 @@ def main():
                 camera.exposure_mode = 'off'
 
             gain_str = "A/D gains: {}, {}".format(camera.analog_gain, camera.digital_gain)
-            with open(nfo_path,'a') as file:
-                file.write(gain_str + '\n')
+            if args.save_nfo:
+                with open(nfo_path,'a') as file:
+                    file.write(gain_str + '\n')
 
             if args.verbose:
                 print("Camera successfully started")
