@@ -108,7 +108,7 @@ def compress(folder_name, dest_path):
     with tarfile.open(folder_name + ".tgz", "w:gz") as tar:
         for file in os.listdir(pathlib.Path(folder_name)):
             tar.add(os.path.join(folder_name, file), arcname=file)
-            time.sleep(0.02)
+            time.sleep(0.05)
 
     try:
         shutil.move(folder_name+".tgz", "%s/%s.tgz" % (dest_path, folder_name))
