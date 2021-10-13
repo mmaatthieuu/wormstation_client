@@ -36,7 +36,8 @@ def save_image(picture_array, k, output_folder, output_filename, compress_step, 
         filename = output_filename
 
     if compress_step is None:
-        image.save(os.path.join(output_folder, filename), quality=quality)
+        save_path = os.path.join(output_folder, filename)
+        image.save(save_path, quality=quality)
 
     else:
         part = k // compress_step
@@ -49,7 +50,8 @@ def save_image(picture_array, k, output_folder, output_filename, compress_step, 
             except FileExistsError:
                 print("\n%s already exists" % current_dir)
 
-        image.save(os.path.join(current_dir, filename), quality=quality)
+        save_path = os.path.join(current_dir, filename)
+        image.save(save_path, quality=quality)
 
         if k % compress_step == compress_step - 1 or k == n_frames_total - 1:
             print(threading.enumerate())
@@ -61,6 +63,7 @@ def save_image(picture_array, k, output_folder, output_filename, compress_step, 
             compress_task.start()
             print(threading.enumerate())
 
+    os.system("ln -sf %s /home/matthieu/tmp/last_frame.jpg" % save_path)
 
 def print_args(args):
 
