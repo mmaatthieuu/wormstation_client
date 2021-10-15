@@ -37,6 +37,9 @@ parser.add_argument("-iso", "--iso", help="sets the apparent ISO setting of the 
                     nargs='?', type=int, default=100)
 parser.add_argument("-ss", "--shutter-speed", help="sets the shutter speed of the camera in microseconds",
                     type=int, default=0)
+parser.add_argument("-br", "--brightness",
+                    help="brightness level of the camera as an integer between 0 and 100 (default 50)",
+                    type=int, default=50)
 parser.add_argument("-x", "--compress", help="",
                     nargs='?', type=int, const=1000)
 parser.add_argument("-sf", "--start-frame", help="input the frame number to start to (default = 0)",
@@ -128,6 +131,7 @@ def main():
                 camera.exposure_mode = 'off'
 
             gain_str = "A/D gains: {}, {}".format(camera.analog_gain, camera.digital_gain)
+            camera.brightness = args.brightness
             if args.save_nfo:
                 with open(nfo_path,'a') as file:
                     file.write(gain_str + '\n')

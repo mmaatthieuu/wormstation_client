@@ -90,6 +90,7 @@ def print_args(args):
         output_str += ("Output files NOT saved to disk\n")
     output_str += ("JPG quality : %d\n" % args.quality)
     output_str += ("ISO : %d\n" % args.iso)
+    output_str += "Brightness : %s\n" % args.brightness
     if args.shutter_speed is not None:
         output_str += ("Shutter speed : %d\n" % args.shutter_speed)
     else:
