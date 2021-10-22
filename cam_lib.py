@@ -63,7 +63,7 @@ def save_image(picture_array, k, output_folder, output_filename, compress_step, 
             compress_task.start()
             print(threading.enumerate())
 
-    os.system("ln -sf %s /home/matthieu/tmp/last_frame.jpg" % save_path)
+    os.system("ln -sf %s /home/matthieu/tmp/last_frame.jpg" % pathlib.Path(save_path).absolute())
 
 def print_args(args):
 
