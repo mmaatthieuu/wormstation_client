@@ -168,7 +168,7 @@ def main():
 
                 if args.output is not None:
                     cl.save_image(pictures_to_average, k, absolute_output_folder,
-                                  output_filename, args.compress, n_frames_total, args.quality)
+                                  output_filename, args.compress, n_frames_total, args.quality, args.average)
 
 
                 execTime = (time.time() - start_time)

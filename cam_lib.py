@@ -1,13 +1,15 @@
 import pathlib
 import time
-
+import datetime
 import numpy as np
 from PIL import Image as im
-import threading
+# import threading
+import multiprocessing
+import psutil
 import sys
 import shutil
 import tarfile
-import os.path
+import os
 
 
 def get_folder_name(in_string: str):
@@ -27,7 +29,7 @@ def get_file_name(in_string: str):
 
 
 
-def save_image(picture_array, k, output_folder, output_filename, compress_step, n_frames_total, quality):
+def save_image(picture_array, k, output_folder, output_filename, compress_step, n_frames_total, quality,avg):
     image = im.fromarray(picture_array)
 
     try:
@@ -53,15 +55,23 @@ def save_image(picture_array, k, output_folder, output_filename, compress_step, 
         save_path = os.path.join(current_dir, filename)
         image.save(save_path, quality=quality)
 
+        os.setxattr(save_path, 'user.datetime', (str(datetime.datetime.now())).encode('utf-8'))
+        os.setxattr(save_path, 'user.index', ("%06d" % k).encode('utf-8'))
+        os.setxattr(save_path, 'user.hostname', (os.uname()[1]).encode('utf-8'))
+        os.setxattr(save_path, 'user.jpg_quality', ("%02d" % quality).encode('utf-8'))
+        os.setxattr(save_path, 'user.averaged', ("%d" % avg).encode('utf-8'))
+
         if k % compress_step == compress_step - 1 or k == n_frames_total - 1:
-            print(threading.enumerate())
+            # print(threading.enumerate())
             #dir_to_compress = "part%02d" % part
             dir_to_compress = current_dir
             print("Dir_to_compress : %s" % dir_to_compress)
             print("Dest path : %s " % output_folder)
-            compress_task = threading.Thread(target=compress, args=(dir_to_compress, output_folder))
+            # compress_task = threading.Thread(target=compress, args=(dir_to_compress, output_folder))
+            compress_task = multiprocessing.Process(target=compress, args=(dir_to_compress, output_folder))
             compress_task.start()
-            print(threading.enumerate())
+
+            # print(threading.enumerate())
 
     os.system("ln -sf %s /home/matthieu/tmp/last_frame.jpg" % pathlib.Path(save_path).absolute())
 
@@ -108,11 +118,16 @@ def print_args(args):
 
 
 def compress(folder_name, dest_path):
+    pid = psutil.Process(os.getpid())
+    pid.nice(15)
     print("Starting compression of %s" % folder_name)
-    with tarfile.open(folder_name + ".tgz", "w:gz") as tar:
-        for file in os.listdir(pathlib.Path(folder_name)):
-            tar.add(os.path.join(folder_name, file), arcname=file)
-            time.sleep(0.05)
+
+    os.system("tar --xattrs -czf %s.tgz -C %s ." % (folder_name, folder_name))
+
+    # with tarfile.open(folder_name + ".tgz", "w:gz") as tar:
+    #     for file in os.listdir(pathlib.Path(folder_name)):
+    #         tar.add(os.path.join(folder_name, file), arcname=file)
+    #         time.sleep(0.1)
 
     try:
         shutil.move(folder_name+".tgz", "%s/%s.tgz" % (dest_path, folder_name))
