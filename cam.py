@@ -62,7 +62,8 @@ if args.output is not None:
 # print(output_filename)
 
 
-
+git_check = subprocess.run(['git', '--git-dir=/home/matthieu/piworm/.git', 'rev-list', '--all', '--abbrev-commit', '-n', '1'],text=True)
+version = git_check.stdout
 
 def init():
 
@@ -95,6 +96,7 @@ def save_info(args):
         nfo_path = pathlib.Path("./%s" % nfo_filename)
 
     with open(nfo_path, 'w') as f:
+        f.write(version)
         f.write(cl.print_args(args))
     return nfo_path
 
@@ -170,7 +172,8 @@ def main():
 
                 if args.output is not None:
                     cl.save_image(pictures_to_average, k, absolute_output_folder,
-                                  output_filename, args.compress, n_frames_total, args.quality, args.average)
+                                  output_filename, args.compress, n_frames_total,
+                                  args.quality, args.average, version)
 
 
                 execTime = (time.time() - start_time)

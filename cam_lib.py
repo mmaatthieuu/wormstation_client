@@ -31,7 +31,8 @@ def get_file_name(in_string: str):
 
 
 
-def save_image(picture_array, k, output_folder, output_filename, compress_step, n_frames_total, quality,avg):
+def save_image(picture_array, k, output_folder, output_filename, compress_step, n_frames_total, quality,
+               avg, version=None):
     image = im.fromarray(picture_array)
 
     try:
@@ -62,6 +63,7 @@ def save_image(picture_array, k, output_folder, output_filename, compress_step, 
         os.setxattr(save_path, 'user.hostname', (os.uname()[1]).encode('utf-8'))
         os.setxattr(save_path, 'user.jpg_quality', ("%02d" % quality).encode('utf-8'))
         os.setxattr(save_path, 'user.averaged', ("%d" % avg).encode('utf-8'))
+        os.setxattr(save_path, 'user.git_version', version.encode('utf-8'))
 
         if k % compress_step == compress_step - 1 or k == n_frames_total - 1:
             # print(threading.enumerate())
