@@ -62,7 +62,8 @@ if args.output is not None:
 # print(output_filename)
 
 
-git_check = subprocess.run(['git', '--git-dir=/home/matthieu/piworm/.git', 'rev-list', '--all', '--abbrev-commit', '-n', '1'],text=True)
+git_check = subprocess.run(['git', '--git-dir=/home/matthieu/piworm/.git', 'rev-list',
+                            '--all', '--abbrev-commit', '-n', '1'], text=True, capture_output=True)
 version = git_check.stdout
 
 def init():
@@ -83,7 +84,7 @@ def init():
         os.chdir(local_tmp_dir)
 
 
-def save_info(args):
+def save_info(args, version):
 
     x = datetime.datetime.now()
 
@@ -96,16 +97,15 @@ def save_info(args):
         nfo_path = pathlib.Path("./%s" % nfo_filename)
 
     with open(nfo_path, 'w') as f:
-        f.write(version)
+        f.write("git commit : %s" % version)
         f.write(cl.print_args(args))
     return nfo_path
 
 
 def main():
     init()
-
     if args.save_nfo:
-        nfo_path = save_info(args)
+        nfo_path = save_info(args, version)
 
     nPicsPerFrames = args.average
     try:
