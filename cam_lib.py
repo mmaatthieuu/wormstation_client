@@ -5,6 +5,8 @@ import numpy as np
 from PIL import Image as im
 # import threading
 import multiprocessing
+import subprocess
+
 import psutil
 import sys
 import shutil
@@ -73,7 +75,8 @@ def save_image(picture_array, k, output_folder, output_filename, compress_step, 
 
             # print(threading.enumerate())
 
-    os.system("ln -sf %s /home/matthieu/tmp/last_frame.jpg" % pathlib.Path(save_path).absolute())
+    #os.system("ln -sf %s /home/matthieu/tmp/last_frame.jpg" % pathlib.Path(save_path).absolute())
+    subprocess.run(['ln', '-sf', '%s' % pathlib.Path(save_path).absolute(), '/home/matthieu/tmp/last_frame.jpg'])
 
 def print_args(args):
 
@@ -119,19 +122,26 @@ def print_args(args):
 
 def compress(folder_name, dest_path):
     pid = psutil.Process(os.getpid())
-    pid.nice(15)
+    pid.nice(19)
     print("Starting compression of %s" % folder_name)
 
-    os.system("tar --xattrs -czf %s.tgz -C %s ." % (folder_name, folder_name))
+    command_string = ("tar --xattrs -czf %s.tgz -C %s ." % (folder_name, folder_name))
+    call_args = ['tar', '--xattrs', '-czf', '%s.tgz' % folder_name, '-C', '%s' % folder_name, '.']
+    #os.system(command_string)
+    subprocess.run(call_args)
 
     # with tarfile.open(folder_name + ".tgz", "w:gz") as tar:
     #     for file in os.listdir(pathlib.Path(folder_name)):
     #         tar.add(os.path.join(folder_name, file), arcname=file)
     #         time.sleep(0.1)
 
+
+    # !!! That is taking much resources !!! -> subprocess ?
     try:
-        shutil.move(folder_name+".tgz", "%s/%s.tgz" % (dest_path, folder_name))
-        shutil.rmtree(folder_name)
+        #shutil.move(folder_name+".tgz", "%s/%s.tgz" % (dest_path, folder_name))
+        #shutil.rmtree(folder_name)
+        subprocess.run(['mv', '%s.tgz' % folder_name, '%s/%s.tgz' % (dest_path, folder_name)])
+        subprocess.run(['rm', '-rf', '%s' % folder_name])
     except OSError as error:
         print("Failed to move and/or delete folder")
         print(error)

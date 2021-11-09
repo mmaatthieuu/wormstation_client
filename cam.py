@@ -7,6 +7,7 @@ import time
 import picamera
 import argparse
 import os.path
+import subprocess
 
 import NPImage as npi
 
@@ -111,6 +112,7 @@ def main():
         n_frames_total = 1
     try:
         delay = 0
+        # subprocess.run("cpulimit -P /usr/bin/gzip -l 25",)
         with picamera.PiCamera(resolution='3296x2464') as camera:
             camera.iso = args.iso
             #camera.CAPTURE_TIMEOUT = 10
