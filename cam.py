@@ -12,7 +12,7 @@ import NPImage as npi
 
 import datetime
 
-import cam_lib as cl
+from cam_lib import *
 
 
 parser = argparse.ArgumentParser()
@@ -54,8 +54,8 @@ args = parser.parse_args()
 
 local_tmp_dir = ".campy_local_save/"
 if args.output is not None:
-    absolute_output_folder = pathlib.Path(cl.get_folder_name(args.output[0])).absolute()
-    output_filename = cl.get_file_name(args.output[0])
+    absolute_output_folder = pathlib.Path(get_folder_name(args.output[0])).absolute()
+    output_filename = get_file_name(args.output[0])
 
 # print(absolute_output_folder)
 # print(output_filename)
@@ -69,12 +69,12 @@ def init():
         args.verbose = True
 
     if args.verbose:
-        print(cl.print_args(args))
+        print(print_args(args))
 
     if args.compress is not None:
         try:
             os.mkdir(local_tmp_dir)
-            print("Folder ", local_tmp_dir, " created")
+            log("Folder ", local_tmp_dir, " created")
         except FileExistsError:
             pass
             # os.remove(".campy_local_save/*")
@@ -87,14 +87,14 @@ def save_info(args):
 
     #nfo_filename = "%s.nfo" % datetime.now()
     nfo_filename = x.strftime("%Y%m%d_%H%M.nfo")
-    print(nfo_filename)
+    log(nfo_filename)
     if args.output is not None:
         nfo_path = pathlib.Path.joinpath(absolute_output_folder, nfo_filename)
     else:
         nfo_path = pathlib.Path("./%s" % nfo_filename)
 
     with open(nfo_path, 'w') as f:
-        f.write(cl.print_args(args))
+        f.write(print_args(args))
     return nfo_path
 
 
@@ -119,7 +119,7 @@ def main():
                 camera.start_preview()
 
             if args.verbose:
-                print("Starting camera...")
+                log("Starting camera...")
             time.sleep(2)  # let the camera warm up and set gain/white balance
 
             if args.shutter_speed is not None:
@@ -137,17 +137,18 @@ def main():
                     file.write(gain_str + '\n')
 
             if args.verbose:
-                print("Camera successfully started")
-                print(gain_str)
+                log("Camera successfully started")
+                log(gain_str)
 
             for k in range(args.start_frame, n_frames_total):
                 start_time = time.time()
                 pictures_to_average = np.empty((2464, 3296), dtype=np.uint8)
 
                 if args.vverbose:
-                    print("Starting capture of frame %d / %d" % (k+1, n_frames_total))
+                    log("Starting capture of frame %d / %d" % (k+1, n_frames_total))
                 elif args.verbose:
-                    print("\rStarting capture of frame %d / %d" % (k + 1, n_frames_total), end="")
+                    print("\r[%s] : Starting capture of frame %d / %d" %
+                          (str(datetime.datetime.now()),k + 1, n_frames_total), end="")
 
                 for i in range(nPicsPerFrames):
                     output = npi.NPImage()
@@ -160,44 +161,44 @@ def main():
                         pictures_to_average = pictures_to_average + output.get_data()// args.average
                         #print(np.max(pictures_to_average))
                     except picamera.exc.PiCameraRuntimeError as error:
-                        print("Error 1 on frame %d" % k)
-                        print(error)
+                        log("Error 1 on frame %d" % k)
+                        log(error)
                         sys.exit()
                     except RuntimeError:
-                        print("Error 2 on frame %d" % k)
+                        log("Error 2 on frame %d" % k)
 
                 if args.output is not None:
-                    cl.save_image(pictures_to_average, k, absolute_output_folder,
+                    save_image(pictures_to_average, k, absolute_output_folder,
                                   output_filename, args.compress, n_frames_total, args.quality, args.average)
 
 
                 execTime = (time.time() - start_time)
                 if args.vverbose:
-                    print("Finished capture of frame %d in %fs" % (k + 1, execTime))
+                    log("Finished capture of frame %d in %fs" % (k + 1, execTime))
 
                 diff_time = args.time_interval - execTime
                 if diff_time - delay > 0:
                     sleep_time = args.time_interval - execTime - delay
                     if args.vverbose:
-                        print("Waiting for %fs" % sleep_time)
+                        log("Waiting for %fs" % sleep_time)
                     time.sleep(sleep_time)
                     delay = 0
                 else:
                     delay -= diff_time
                     if args.verbose:
-                        print('\nFrame %fs late' % -diff_time)
-                        print('Delay : %fs' % delay)
+                        log('\nFrame %fs late' % -diff_time)
+                        log('Delay : %fs' % delay)
     except KeyboardInterrupt:
-        print("\nScript interrupted by user")
+        log("\nScript interrupted by user")
     # else:
-    #     print("\nOops... Something went wrong.\n")
+    #     log("\nOops... Something went wrong.\n")
     finally:
         if args.verbose:
-            print("Closing camera...")
+            log("Closing camera...")
         camera.close()
 
         if args.verbose:
-            print("Over.")
+            log("Over.")
 
 if __name__ == "__main__":
     main()

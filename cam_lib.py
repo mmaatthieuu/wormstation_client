@@ -15,10 +15,10 @@ import os
 def get_folder_name(in_string: str):
     if '/' in in_string:
         folder_name = "/".join(in_string.split('/')[0:-1])
-        # print(folder_name)
+        # log(folder_name)
         return folder_name
     else:
-        print("Output files need to be in a folder")
+        log("Output files need to be in a folder")
         # args.compress = None
         return None
 
@@ -27,7 +27,8 @@ def get_file_name(in_string: str):
     return in_string.split('/')[-1]
 
 
-
+def log(log_msg, end="\n"):
+    print("[%s] : %s" %  (str(datetime.datetime.now()),log_msg), end=end)
 
 def save_image(picture_array, k, output_folder, output_filename, compress_step, n_frames_total, quality,avg):
     image = im.fromarray(picture_array)
@@ -48,9 +49,10 @@ def save_image(picture_array, k, output_folder, output_filename, compress_step, 
         if k % compress_step == 0:
             try:
                 os.mkdir(current_dir)
-                print("\n%s created" % current_dir)
+                #log("\n%s created" % current_dir)
             except FileExistsError:
-                print("\n%s already exists" % current_dir)
+                # log("\n%s already exists" % current_dir)
+                pass
 
         save_path = os.path.join(current_dir, filename)
         image.save(save_path, quality=quality)
@@ -62,16 +64,16 @@ def save_image(picture_array, k, output_folder, output_filename, compress_step, 
         os.setxattr(save_path, 'user.averaged', ("%d" % avg).encode('utf-8'))
 
         if k % compress_step == compress_step - 1 or k == n_frames_total - 1:
-            # print(threading.enumerate())
+            # log(threading.enumerate())
             #dir_to_compress = "part%02d" % part
             dir_to_compress = current_dir
-            print("Dir_to_compress : %s" % dir_to_compress)
-            print("Dest path : %s " % output_folder)
+            log("Dir_to_compress : %s" % dir_to_compress)
+            log("Dest path : %s " % output_folder)
             # compress_task = threading.Thread(target=compress, args=(dir_to_compress, output_folder))
             compress_task = multiprocessing.Process(target=compress, args=(dir_to_compress, output_folder))
             compress_task.start()
 
-            # print(threading.enumerate())
+            # log(threading.enumerate())
 
     os.system("ln -sf %s /home/matthieu/tmp/last_frame.jpg" % pathlib.Path(save_path).absolute())
 
@@ -120,7 +122,7 @@ def print_args(args):
 def compress(folder_name, dest_path):
     pid = psutil.Process(os.getpid())
     pid.nice(15)
-    print("Starting compression of %s" % folder_name)
+    log("Starting compression of %s" % folder_name)
 
     os.system("tar --xattrs -czf %s.tgz -C %s ." % (folder_name, folder_name))
 
@@ -133,10 +135,10 @@ def compress(folder_name, dest_path):
         shutil.move(folder_name+".tgz", "%s/%s.tgz" % (dest_path, folder_name))
         shutil.rmtree(folder_name)
     except OSError as error:
-        print("Failed to move and/or delete folder")
-        print(error)
+        log("Failed to move and/or delete folder")
+        log(error)
 
-    print("\nCompression of %s done" % folder_name)
+    log("\nCompression of %s done" % folder_name)
 
 
 def compressor(x, ratio, threshold):
@@ -147,3 +149,4 @@ def compressor(x, ratio, threshold):
     y2 = np.array(ratio * y2 + threshold * (1 - ratio), dtype=np.uint8)
     y2[y1<threshold]=0
     return y1+y2
+
