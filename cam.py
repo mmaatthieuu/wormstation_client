@@ -98,7 +98,7 @@ def save_info(args, version):
 
     with open(nfo_path, 'w') as f:
         f.write("git commit : %s" % version)
-        f.write(cl.print_args(args))
+        f.write(print_args(args))
 
     return nfo_path
 
