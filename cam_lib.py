@@ -140,7 +140,8 @@ def compress(folder_name, dest_path):
     #         tar.add(os.path.join(folder_name, file), arcname=file)
     #         time.sleep(0.1)
 
-
+    log("\n")
+    log("Compression of %s done" % folder_name)
     # !!! That is taking much resources !!! -> subprocess ?
     try:
         #shutil.move(folder_name+".tgz", "%s/%s.tgz" % (dest_path, folder_name))
@@ -151,7 +152,7 @@ def compress(folder_name, dest_path):
         log("Failed to move and/or delete folder")
         log(error)
 
-    log("\nCompression of %s done" % folder_name)
+    log("%s moved to destination" % folder_name)
 
 
 def compressor(x, ratio, threshold):

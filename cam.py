@@ -115,7 +115,7 @@ def main():
         n_frames_total = 1
     try:
         delay = 0
-        # subprocess.run("cpulimit -P /usr/bin/gzip -l 25",)
+        subprocess.run(['cpulimit', '-P', '/usr/bin/gzip', '-l', '10','-b'])
         with picamera.PiCamera(resolution='3296x2464') as camera:
             camera.iso = args.iso
             #camera.CAPTURE_TIMEOUT = 10
