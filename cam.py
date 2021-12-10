@@ -41,7 +41,7 @@ parser.add_argument("-ss", "--shutter-speed", help="sets the shutter speed of th
 parser.add_argument("-br", "--brightness",
                     help="brightness level of the camera as an integer between 0 and 100 (default 50)",
                     type=int, default=50)
-parser.add_argument("-x", "--compress", help="",
+parser.add_argument("-x", "--compress", help="compress the output in tgz archive, with <N> pictures per archive (default 1000)",
                     nargs='?', type=int, const=1000)
 parser.add_argument("-sf", "--start-frame", help="input the frame number to start to (default = 0)",
                     type=int, default=0)
@@ -199,6 +199,9 @@ def main():
     # else:
     #     log("\nOops... Something went wrong.\n")
     finally:
+
+        subprocess.run(['pkill', 'cpulimit'])
+
         if args.verbose:
             log("Closing camera...")
         camera.close()
