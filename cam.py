@@ -15,7 +15,6 @@ import datetime
 
 from cam_lib import *
 
-
 parser = argparse.ArgumentParser()
 
 parser.add_argument("-v", "--verbose", help="increase output verbosity",
@@ -35,7 +34,7 @@ parser.add_argument("-o","--output", help="output filename",
 parser.add_argument("-q", "--quality", help="set jpeg quality <0 to 100>",
                     nargs='?', type=int, default=75)
 parser.add_argument("-iso", "--iso", help="sets the apparent ISO setting of the camera",
-                    nargs='?', type=int, default=100)
+                    nargs='?', type=int, default=0)
 parser.add_argument("-ss", "--shutter-speed", help="sets the shutter speed of the camera in microseconds",
                     type=int, default=0)
 parser.add_argument("-br", "--brightness",
@@ -103,6 +102,7 @@ def save_info(args, version):
     return nfo_path
 
 
+
 def main():
     init()
     if args.save_nfo:
@@ -117,26 +117,19 @@ def main():
         delay = 0
         subprocess.run(['cpulimit', '-P', '/usr/bin/gzip', '-l', '10','-b'])
         with picamera.PiCamera(resolution='3296x2464') as camera:
-            camera.iso = args.iso
+
+            cam_init(camera, iso=args.iso, shutter_speed=args.shutter_speed, brightness=args.brightness,
+                     verbose=args.verbose)
             #camera.CAPTURE_TIMEOUT = 10
 
             if args.preview:
                 camera.start_preview()
 
-            if args.verbose:
-                log("Starting camera...")
-            time.sleep(2)  # let the camera warm up and set gain/white balance
 
-            if args.shutter_speed is not None:
-                g = camera.awb_gains
-                camera.awb_mode = "off"
-                camera.awb_gains = g
-
-                camera.shutter_speed = args.shutter_speed
-                camera.exposure_mode = 'off'
+            #time.sleep(2)  # let the camera warm up and set gain/white balance
 
             gain_str = "A/D gains: {}, {}".format(camera.analog_gain, camera.digital_gain)
-            camera.brightness = args.brightness
+
             if args.save_nfo:
                 with open(nfo_path,'a') as file:
                     file.write(gain_str + '\n')

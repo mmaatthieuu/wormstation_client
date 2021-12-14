@@ -13,6 +13,9 @@ import shutil
 import tarfile
 import os
 
+from set_picamera_gain import set_analog_gain, set_digital_gain
+
+
 
 def get_folder_name(in_string: str):
     if '/' in in_string:
@@ -31,6 +34,37 @@ def get_file_name(in_string: str):
 
 def log(log_msg, end="\n"):
     print("[%s] : %s" %  (str(datetime.datetime.now()),log_msg), end=end)
+
+
+def cam_init(cam, iso, shutter_speed, brightness, verbose):
+    cam.iso = iso
+
+    if verbose:
+        log("Starting camera...")
+    time.sleep(1)
+
+    # fix the auto white balance gains at their current values
+    g = cam.awb_gains
+    cam.awb_mode = "off"
+    cam.awb_gains = g
+
+    # fix the shutter speed
+    cam.shutter_speed = shutter_speed
+
+    set_analog_gain(cam, 1)
+    set_digital_gain(cam, 1)
+    """
+    if shutter_speed is not None:
+        g = cam.awb_gains
+        cam.awb_mode = "off"
+        cam.awb_gains = g
+
+        cam.shutter_speed = shutter_speed
+        cam.exposure_mode = 'off'
+    """
+    time.sleep(0.5)
+    cam.brightness = brightness
+
 
 def save_image(picture_array, k, output_folder, output_filename, compress_step, n_frames_total, quality,
                avg, version=None):
