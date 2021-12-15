@@ -115,11 +115,27 @@ def record(args, camera):
 
     skip_frame = False
     for k in range(args.start_frame, n_frames_total):
-        start_time = time.time()
+
 
         pictures_to_average = np.empty((2464, 3296), dtype=np.uint8)
 
+        delay = time.time() - (initial_time + (k) * args.time_interval)
+        if delay < 0:
+            time.sleep(-delay)
+            if args.vverbose:
+                log("Waiting for %fs" % -delay)
+        elif delay < 0.005:     # We need tolerance in this world
+            pass
+        else:
+            if args.verbose:
+                #log('Frame %fs late' % -diff_time, begin="\n")
+                log('Delay : %fs' % delay)
+
+        if delay >= args.time_interval:
+            skip_frame = True
+
         if not skip_frame:
+            start_time = time.time()
             if args.vverbose:
                 log("Starting capture of frame %d / %d" % (k + 1, n_frames_total))
             elif args.verbose:
@@ -152,9 +168,16 @@ def record(args, camera):
             if args.vverbose:
                 log("Finished capture of frame %d in %fs" % (k + 1, execTime))
 
-            diff_time = args.time_interval - execTime
-            delay = time.time() - (initial_time + (k + 1) * args.time_interval)
 
+            """
+            
+            delay not very precise the first time
+            
+            """
+
+            """
+            delay = time.time() - (initial_time + (k+1) * args.time_interval)
+            print(delay)
             if diff_time - delay > 0:
                 sleep_time = args.time_interval - execTime - delay
                 if args.vverbose:
@@ -167,9 +190,7 @@ def record(args, camera):
                     log('Frame %fs late' % -diff_time, begin="\n")
                     log('Delay : %fs' % delay)
 
-                if delay >= args.time_interval:
-                    log("delay too long, skipping next frame")
-                    skip_frame = True
+            """
 
         else:   # Skipping frame
             log("Skipping frame %d" % (k+1), begin="\n    WARNING    ")
