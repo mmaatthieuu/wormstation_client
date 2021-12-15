@@ -156,7 +156,9 @@ def record(args, camera):
                 except picamera.exc.PiCameraRuntimeError as error:
                     log("Error 1 on frame %d" % k)
                     log(error)
-                    raise TimeoutError(k)
+                    skip_frame = True
+                    continue
+                    #raise TimeoutError(k)
                     # sys.exit()
                 except RuntimeError:
                     log("Error 2 on frame %d" % k)
@@ -209,15 +211,16 @@ def main():
     if args.save_nfo:
         nfo_path = save_info(args, version)
 
+    picamera.PiCamera.CAPTURE_TIMEOUT = 2
 
     try:
 
-        subprocess.run(['cpulimit', '-P', '/usr/bin/gzip', '-l', '10','-b'])
+        subprocess.run(['cpulimit', '-P', '/usr/bin/gzip', '-l', '10', '-b', '-q'])
         with picamera.PiCamera(resolution='3296x2464') as camera:
 
             cam_init(camera, iso=args.iso, shutter_speed=args.shutter_speed, brightness=args.brightness,
                      verbose=args.verbose)
-            #picamera.PiCamera.CAPTURE_TIMEOUT = 10
+
 
             if args.preview:
                 camera.start_preview()
@@ -247,7 +250,7 @@ def main():
     #     log("\nOops... Something went wrong.\n")
     except TimeoutError as e:
         print("caught")
-        print(k)
+        print(e)
         #picamera.PiCamera.CAPTURE_TIMEOUT = 10
 
     finally:
