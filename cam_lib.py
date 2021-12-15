@@ -32,8 +32,8 @@ def get_file_name(in_string: str):
     return in_string.split('/')[-1]
 
 
-def log(log_msg, end="\n"):
-    print("[%s] : %s" %  (str(datetime.datetime.now()),log_msg), end=end)
+def log(log_msg, begin="", end="\n"):
+    print("%s[%s] : %s" %  (begin, str(datetime.datetime.now()), log_msg), end=end)
 
 
 def cam_init(cam, iso, shutter_speed, brightness, verbose):
@@ -67,7 +67,7 @@ def cam_init(cam, iso, shutter_speed, brightness, verbose):
 
 
 def save_image(picture_array, k, output_folder, output_filename, compress_step, n_frames_total, quality,
-               avg, version=None):
+               avg, version=None, skipped=False):
     image = im.fromarray(picture_array)
 
     try:
@@ -100,6 +100,7 @@ def save_image(picture_array, k, output_folder, output_filename, compress_step, 
         os.setxattr(save_path, 'user.jpg_quality', ("%02d" % quality).encode('utf-8'))
         os.setxattr(save_path, 'user.averaged', ("%d" % avg).encode('utf-8'))
         os.setxattr(save_path, 'user.git_version', version.encode('utf-8'))
+        os.setxattr(save_path, 'user.skipped', ("%d" % int(skipped)).encode('utf-8'))
 
         if k % compress_step == compress_step - 1 or k == n_frames_total - 1:
             # log(threading.enumerate())

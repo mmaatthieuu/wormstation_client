@@ -112,54 +112,74 @@ def record(args, camera, delay=0):
     except ZeroDivisionError:
         n_frames_total = 1
 
+    initial_time = time.time()
+    skip_frame = False
     for k in range(args.start_frame, n_frames_total):
         start_time = time.time()
+
         pictures_to_average = np.empty((2464, 3296), dtype=np.uint8)
 
-        if args.vverbose:
-            log("Starting capture of frame %d / %d" % (k + 1, n_frames_total))
-        elif args.verbose:
-            print("\r[%s] : Starting capture of frame %d / %d" %
-                  (str(datetime.datetime.now()), k + 1, n_frames_total), end="")
-
-        for i in range(nPicsPerFrames):
-            output = npi.NPImage()
-            try:
-
-                camera.capture(output, 'yuv', use_video_port=False)
-                time.sleep(0.05)
-                # pictures_to_average = pictures_to_average + \
-                #                      cl.compressor(output.get_data(),args.r,args.th) // args.average
-                pictures_to_average = pictures_to_average + output.get_data() // args.average
-                # print(np.max(pictures_to_average))
-            except picamera.exc.PiCameraRuntimeError as error:
-                log("Error 1 on frame %d" % k)
-                log(error)
-                raise TimeoutError(k)
-                # sys.exit()
-            except RuntimeError:
-                log("Error 2 on frame %d" % k)
-
-        if args.output is not None:
-            save_image(pictures_to_average, k, absolute_output_folder,
-                       output_filename, args.compress, n_frames_total, args.quality, args.average, version)
-
-        execTime = (time.time() - start_time)
-        if args.vverbose:
-            log("Finished capture of frame %d in %fs" % (k + 1, execTime))
-
-        diff_time = args.time_interval - execTime
-        if diff_time - delay > 0:
-            sleep_time = args.time_interval - execTime - delay
+        if not skip_frame:
             if args.vverbose:
-                log("Waiting for %fs" % sleep_time)
-            time.sleep(sleep_time)
-            delay = 0
-        else:
-            delay -= diff_time
-            if args.verbose:
-                log('\nFrame %fs late' % -diff_time)
-                log('Delay : %fs' % delay)
+                log("Starting capture of frame %d / %d" % (k + 1, n_frames_total))
+            elif args.verbose:
+                print("\r[%s] : Starting capture of frame %d / %d" %
+                      (str(datetime.datetime.now()), k + 1, n_frames_total), end="")
+
+            for i in range(nPicsPerFrames):
+                output = npi.NPImage()
+                try:
+
+                    camera.capture(output, 'yuv', use_video_port=False)
+                    time.sleep(0.05)
+                    # pictures_to_average = pictures_to_average + \
+                    #                      cl.compressor(output.get_data(),args.r,args.th) // args.average
+                    pictures_to_average = pictures_to_average + output.get_data() // args.average
+                    # print(np.max(pictures_to_average))
+                except picamera.exc.PiCameraRuntimeError as error:
+                    log("Error 1 on frame %d" % k)
+                    log(error)
+                    raise TimeoutError(k)
+                    # sys.exit()
+                except RuntimeError:
+                    log("Error 2 on frame %d" % k)
+
+            if args.output is not None:
+                save_image(pictures_to_average, k, absolute_output_folder,
+                           output_filename, args.compress, n_frames_total, args.quality, args.average, version)
+
+            execTime = (time.time() - start_time)
+            if args.vverbose:
+                log("Finished capture of frame %d in %fs" % (k + 1, execTime))
+
+            diff_time = args.time_interval - execTime
+            if diff_time - delay > 0:
+                sleep_time = args.time_interval - execTime - delay
+                if args.vverbose:
+                    log("Waiting for %fs" % sleep_time)
+                time.sleep(sleep_time)
+                delay = 0
+            else:
+                # delay -= diff_time
+                delay = time.time() - (initial_time + (k + 1) * args.time_interval)
+                if args.verbose:
+                    log('Frame %fs late' % -diff_time, begin="\n")
+                    log('Delay : %fs' % delay)
+
+                if delay >= args.time_interval:
+                    log("delay too long, skipping next frame")
+                    skip_frame = True
+
+        else:   # Skipping frame
+            log("Skipping frame %d" % (k+1), begin="\n    WARNING    ")
+            print("")
+            save_image(pictures_to_average, k, absolute_output_folder,
+                       output_filename, args.compress, n_frames_total, args.quality, args.average, version,
+                       skipped=True)
+            skip_frame = False
+
+
+
 
 def main():
     init()
