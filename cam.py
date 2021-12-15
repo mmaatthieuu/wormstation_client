@@ -104,7 +104,7 @@ def save_info(args, version):
     return nfo_path
 
 
-def record(args, camera, delay=0):
+def record(args, camera):
 
     nPicsPerFrames = args.average
     try:
@@ -112,7 +112,7 @@ def record(args, camera, delay=0):
     except ZeroDivisionError:
         n_frames_total = 1
 
-    initial_time = time.time()
+
     skip_frame = False
     for k in range(args.start_frame, n_frames_total):
         start_time = time.time()
@@ -153,15 +153,16 @@ def record(args, camera, delay=0):
                 log("Finished capture of frame %d in %fs" % (k + 1, execTime))
 
             diff_time = args.time_interval - execTime
+            delay = time.time() - (initial_time + (k + 1) * args.time_interval)
+
             if diff_time - delay > 0:
                 sleep_time = args.time_interval - execTime - delay
                 if args.vverbose:
                     log("Waiting for %fs" % sleep_time)
                 time.sleep(sleep_time)
-                delay = 0
             else:
                 # delay -= diff_time
-                delay = time.time() - (initial_time + (k + 1) * args.time_interval)
+
                 if args.verbose:
                     log('Frame %fs late' % -diff_time, begin="\n")
                     log('Delay : %fs' % delay)
@@ -211,6 +212,9 @@ def main():
             if args.verbose:
                 log("Camera successfully started")
                 log(gain_str)
+
+            global initial_time
+            initial_time = time.time()
 
             record(args=args, camera=camera)
 
