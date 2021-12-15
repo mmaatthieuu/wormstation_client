@@ -131,7 +131,8 @@ def record(args, camera):
                 #log('Frame %fs late' % -diff_time, begin="\n")
                 log('Delay : %fs' % delay)
 
-        if delay >= args.time_interval:
+        # condition on k is useful if one just want one frame and does not care about time
+        if delay >= args.time_interval and k < (n_frames_total-1) :
             skip_frame = True
 
         if not skip_frame:
