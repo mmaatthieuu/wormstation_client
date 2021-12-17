@@ -12,6 +12,8 @@ import sys
 import shutil
 import tarfile
 import os
+import picamera
+
 
 from set_picamera_gain import set_analog_gain, set_digital_gain
 
@@ -36,7 +38,9 @@ def log(log_msg, begin="", end="\n"):
     print("%s[%s] : %s" %  (begin, str(datetime.datetime.now()), log_msg), end=end)
 
 
-def cam_init(cam, iso, shutter_speed, brightness, verbose):
+def cam_init(iso, shutter_speed, brightness, verbose):
+
+    cam = picamera.PiCamera(resolution='3296x2464')
     cam.iso = iso
 
     if verbose:
@@ -64,6 +68,8 @@ def cam_init(cam, iso, shutter_speed, brightness, verbose):
     """
     time.sleep(0.5)
     cam.brightness = brightness
+
+    return cam
 
 
 def save_image(picture_array, k, output_folder, output_filename, compress_step, n_frames_total, quality,

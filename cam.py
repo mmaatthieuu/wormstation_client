@@ -15,7 +15,7 @@ import datetime
 
 from cam_lib import *
 
-#from CrashTimeOutException import CrashTimeOutException
+from CrashTimeOutException import CrashTimeOutException
 
 parser = argparse.ArgumentParser()
 
@@ -112,6 +112,7 @@ def record(args, camera):
     except ZeroDivisionError:
         n_frames_total = 1
 
+    number_of_skipped_frames = 0
 
     skip_frame = False
     for k in range(args.start_frame, n_frames_total):
@@ -152,13 +153,18 @@ def record(args, camera):
                     # pictures_to_average = pictures_to_average + \
                     #                      cl.compressor(output.get_data(),args.r,args.th) // args.average
                     pictures_to_average = pictures_to_average + output.get_data() // args.average
+                    number_of_skipped_frames = 0
                     # print(np.max(pictures_to_average))
                 except picamera.exc.PiCameraRuntimeError as error:
                     log("Error 1 on frame %d" % k)
                     log(error)
                     skip_frame = True
-                    continue
-                    #raise TimeoutError(k)
+                    if number_of_skipped_frames == 0:
+                        number_of_skipped_frames+=1
+                        continue
+                    else:
+                        log("Warning : Camera seems stuck... Trying to restart it")
+                        raise CrashTimeOutException(k)
                     # sys.exit()
                 except RuntimeError:
                     log("Error 2 on frame %d" % k)
@@ -211,49 +217,66 @@ def main():
     if args.save_nfo:
         nfo_path = save_info(args, version)
 
-    picamera.PiCamera.CAPTURE_TIMEOUT = 2
+    picamera.PiCamera.CAPTURE_TIMEOUT = 0.2
 
     try:
 
         subprocess.run(['cpulimit', '-P', '/usr/bin/gzip', '-l', '10', '-b', '-q'])
-        with picamera.PiCamera(resolution='3296x2464') as camera:
 
-            cam_init(camera, iso=args.iso, shutter_speed=args.shutter_speed, brightness=args.brightness,
-                     verbose=args.verbose)
-
-
-            if args.preview:
-                camera.start_preview()
+        camera = cam_init(iso=args.iso, shutter_speed=args.shutter_speed, brightness=args.brightness,
+                 verbose=args.verbose)
 
 
-            #time.sleep(2)  # let the camera warm up and set gain/white balance
+        if args.preview:
+            camera.start_preview()
 
-            gain_str = "A/D gains: {}, {}".format(camera.analog_gain, camera.digital_gain)
 
-            if args.save_nfo:
-                with open(nfo_path,'a') as file:
-                    file.write(gain_str + '\n')
+        #time.sleep(2)  # let the camera warm up and set gain/white balance
 
-            if args.verbose:
-                log("Camera successfully started")
-                log(gain_str)
+        gain_str = "A/D gains: {}, {}".format(camera.analog_gain, camera.digital_gain)
 
-            global initial_time
-            initial_time = time.time()
+        if args.save_nfo:
+            with open(nfo_path,'a') as file:
+                file.write(gain_str + '\n')
 
-            record(args=args, camera=camera)
+        if args.verbose:
+            log("Camera successfully started")
+            log(gain_str)
+
+        global initial_time
+        initial_time = time.time()
+
+        record(args=args, camera=camera)
 
 
     except KeyboardInterrupt:
         log("\nScript interrupted by user")
+
+        subprocess.run(['pkill', 'cpulimit'])
+
+        if args.verbose:
+            log("Closing camera...")
+        camera.close()
+
+        if args.verbose:
+            log("Over.")
     # else:
     #     log("\nOops... Something went wrong.\n")
     except TimeoutError as e:
-        print("caught")
-        print(e)
+
+        camera.close()
+        log("Camera closed")
+        camera = cam_init(iso=args.iso, shutter_speed=args.shutter_speed, brightness=args.brightness,
+                 verbose=args.verbose)
+        log("Camera up again")
+        args.start_frame = int(e.frame_number)
+
+        log("Restart record at frame %d" % args.start_frame)
+        picamera.PiCamera.CAPTURE_TIMEOUT = 2
+        record(args=args, camera=camera)
         #picamera.PiCamera.CAPTURE_TIMEOUT = 10
 
-    finally:
+    else:
 
         subprocess.run(['pkill', 'cpulimit'])
 
