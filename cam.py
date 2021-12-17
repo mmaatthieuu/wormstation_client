@@ -217,7 +217,7 @@ def main():
     if args.save_nfo:
         nfo_path = save_info(args, version)
 
-    picamera.PiCamera.CAPTURE_TIMEOUT = 0.2
+    picamera.PiCamera.CAPTURE_TIMEOUT = 2
 
     try:
 
@@ -272,7 +272,6 @@ def main():
         args.start_frame = int(e.frame_number)
 
         log("Restart record at frame %d" % args.start_frame)
-        picamera.PiCamera.CAPTURE_TIMEOUT = 2
         record(args=args, camera=camera)
         #picamera.PiCamera.CAPTURE_TIMEOUT = 10
 
