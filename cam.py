@@ -9,7 +9,9 @@ import argparse
 import os.path
 import subprocess
 from multiprocessing.pool import ThreadPool
-from threading import Thread
+from multiprocessing import Process
+from threading import Thread,Lock
+from queue import Queue
 
 import NPImage as npi
 
@@ -107,13 +109,25 @@ def save_info(args, version):
     return nfo_path
 
 
-def save_pic_to_frame(main_frame, new_pic, n):
-    main_frame = main_frame + new_pic // n
+def save_pic_to_frame(new_pic, n, lock):
+    lock.acquire()
+    global current_frame
+    current_frame = current_frame + new_pic // n
+    lock.release()
+
+def test_add(lock):
+    lock.acquire()
+    global test_counter
+    test_counter+= 1
+    lock.release()
 
 def record(args, camera):
 
     global ttt
     global iii
+
+    global current_frame
+    global test_counter
 
     ttt = 0
     iii = 0
@@ -129,8 +143,7 @@ def record(args, camera):
     skip_frame = False
     for k in range(args.start_frame, n_frames_total):
 
-
-        main_frame = np.empty((2464, 3296), dtype=np.uint8)
+        current_frame = np.empty((2464, 3296), dtype=np.uint8)
 
         delay = time.time() - (initial_time + (k) * args.time_interval)
         if delay < 0:
@@ -157,6 +170,8 @@ def record(args, camera):
                       (str(datetime.datetime.now()), k + 1, n_frames_total), end="")
 
             output = npi.NPImage()
+            lock = Lock()
+
             #for i in range(nPicsPerFrames):
 
             ttime = time.time()
@@ -168,12 +183,8 @@ def record(args, camera):
                     #time.sleep(0.01)
 
                     #pictures_to_average[:,:,i] = output.get_data()
-                    Thread(target=save_pic_to_frame, args=(main_frame, output.get_data(), nPicsPerFrames)).start()
+                    Thread(target=save_pic_to_frame, args=(output.get_data(), nPicsPerFrames, lock)).start()
 
-                    # pictures_to_average = pictures_to_average + \
-                    #                      cl.compressor(output.get_data(),args.r,args.th) // args.average
-                    #new_pic = output.get_data() // args.average
-                    #pictures_to_average = pictures_to_average + new_pic
                     number_of_skipped_frames = 0
 
                     log((time.time() - ttime) / (i + 1))
@@ -199,7 +210,7 @@ def record(args, camera):
                     log("Error 2 on frame %d" % k)
 
             if args.output is not None:
-                save_image(main_frame, k, absolute_output_folder,
+                save_image(current_frame, k, absolute_output_folder,
                            output_filename, args.compress, n_frames_total, args.quality, args.average, version)
 
             execTime = (time.time() - start_time)
@@ -233,7 +244,7 @@ def record(args, camera):
         else:   # Skipping frame
             log("Skipping frame %d" % (k+1), begin="\n    WARNING    ")
             print("")
-            save_image(main_frame, k, absolute_output_folder,
+            save_image(current_frame, k, absolute_output_folder,
                        output_filename, args.compress, n_frames_total, args.quality, args.average, version,
                        skipped=True)
             skip_frame = False
