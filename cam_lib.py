@@ -40,6 +40,7 @@ def log(log_msg, begin="", end="\n"):
 
 def cam_init(iso, shutter_speed, brightness, verbose):
 
+    #cam = picamera.PiCamera(resolution='3296x2464')
     cam = picamera.PiCamera(resolution='3296x2464')
     cam.iso = iso
 

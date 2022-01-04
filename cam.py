@@ -8,6 +8,8 @@ import picamera
 import argparse
 import os.path
 import subprocess
+from multiprocessing.pool import ThreadPool
+from threading import Thread
 
 import NPImage as npi
 
@@ -105,6 +107,9 @@ def save_info(args, version):
     return nfo_path
 
 
+def save_pic_to_frame(main_frame, new_pic, n):
+    main_frame = main_frame + new_pic // n
+
 def record(args, camera):
 
     global ttt
@@ -125,7 +130,7 @@ def record(args, camera):
     for k in range(args.start_frame, n_frames_total):
 
 
-        pictures_to_average = np.empty((2464, 3296), dtype=np.uint8)
+        main_frame = np.empty((2464, 3296), dtype=np.uint8)
 
         delay = time.time() - (initial_time + (k) * args.time_interval)
         if delay < 0:
@@ -151,24 +156,33 @@ def record(args, camera):
                 print("\r[%s] : Starting capture of frame %d / %d" %
                       (str(datetime.datetime.now()), k + 1, n_frames_total), end="")
 
-            for i in range(nPicsPerFrames):
-                output = npi.NPImage()
+            output = npi.NPImage()
+            #for i in range(nPicsPerFrames):
+
+            ttime = time.time()
+            for i, fname in enumerate(camera.capture_continuous(output, 'yuv', use_video_port=False, burst=True)):
+                #output = npi.NPImage()
                 try:
 
-                    camera.capture(output, 'yuv', use_video_port=False)
-                    time.sleep(0.05)
+                    #camera.capture_continuous(output, 'yuv', use_video_port=False, burst=False)
+                    #time.sleep(0.01)
 
+                    #pictures_to_average[:,:,i] = output.get_data()
+                    Thread(target=save_pic_to_frame, args=(main_frame, output.get_data(), nPicsPerFrames)).start()
 
                     # pictures_to_average = pictures_to_average + \
                     #                      cl.compressor(output.get_data(),args.r,args.th) // args.average
-                    new_pic = output.get_data() // args.average
-                    pictures_to_average = pictures_to_average + new_pic
+                    #new_pic = output.get_data() // args.average
+                    #pictures_to_average = pictures_to_average + new_pic
                     number_of_skipped_frames = 0
 
-                    log((time.time() - start_time) / (i + 1))
+                    log((time.time() - ttime) / (i + 1))
 
-                    ttt += (time.time() - start_time) / (i + 1)
+                    ttt += (time.time() - ttime) / (i + 1)
                     iii += 1
+
+                    if i == nPicsPerFrames-1:
+                        break
                     # print(np.max(pictures_to_average))
                 except picamera.exc.PiCameraRuntimeError as error:
                     log("Error 1 on frame %d" % k)
@@ -185,7 +199,7 @@ def record(args, camera):
                     log("Error 2 on frame %d" % k)
 
             if args.output is not None:
-                save_image(pictures_to_average, k, absolute_output_folder,
+                save_image(main_frame, k, absolute_output_folder,
                            output_filename, args.compress, n_frames_total, args.quality, args.average, version)
 
             execTime = (time.time() - start_time)
@@ -219,7 +233,7 @@ def record(args, camera):
         else:   # Skipping frame
             log("Skipping frame %d" % (k+1), begin="\n    WARNING    ")
             print("")
-            save_image(pictures_to_average, k, absolute_output_folder,
+            save_image(main_frame, k, absolute_output_folder,
                        output_filename, args.compress, n_frames_total, args.quality, args.average, version,
                        skipped=True)
             skip_frame = False
