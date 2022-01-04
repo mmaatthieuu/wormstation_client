@@ -139,7 +139,7 @@ def print_args(args):
     output_str = ""
 
     output_str += ("Verbosity : %s\n" % args.verbose)
-    output_str += ("Time interval between frames [seconds] : %d\n" % args.time_interval)
+    output_str += ("Time interval between frames [seconds] : %0.2f\n" % args.time_interval)
     output_str += ("Pictures averaged at each frame : %d\n" % nPicsPerFrames)
     output_str += ("Timeout : %ds (%dh%dmin%ds)\n" % (args.timeout, h, mins, s))
     output_str += ("Total number of frames : " + str(n_frames_total) + "\n")

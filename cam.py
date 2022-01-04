@@ -32,7 +32,7 @@ parser.add_argument("-p", "--preview", help="display camera preview",
 parser.add_argument("-t", "--timeout", help="time (in s) before takes picture and shuts down",
                     default=10, nargs='?', type=int)
 parser.add_argument("-ti", "--time-interval", help="time interval between frames in seconds",
-                    default=5, nargs='?', type=int)
+                    default=5, nargs='?', type=float)
 parser.add_argument("-avg", "--average", help="number of pictures to average at each frame",
                     default=3, nargs='?', type=int)
 parser.add_argument("-o","--output", help="output filename",
@@ -125,7 +125,7 @@ def record(args, camera):
 
     nPicsPerFrames = args.average
     try:
-        n_frames_total = args.timeout // args.time_interval
+        n_frames_total = int(args.timeout / args.time_interval)
     except ZeroDivisionError:
         n_frames_total = 1
 
@@ -279,7 +279,6 @@ def main():
         if args.verbose:
             log("Over.")
 
-        log(ttt / iii)
     # else:
     #     log("\nOops... Something went wrong.\n")
     except TimeoutError as e:
@@ -305,8 +304,6 @@ def main():
 
         if args.verbose:
             log("Over.")
-
-        log(ttt/iii)
 
 if __name__ == "__main__":
     main()
