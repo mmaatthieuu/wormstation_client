@@ -115,22 +115,13 @@ def save_pic_to_frame(new_pic, n, lock):
     current_frame = current_frame + new_pic // n
     lock.release()
 
-def test_add(lock):
-    lock.acquire()
-    global test_counter
-    test_counter+= 1
-    lock.release()
 
 def record(args, camera):
 
-    global ttt
-    global iii
 
     global current_frame
     global test_counter
 
-    ttt = 0
-    iii = 0
 
     nPicsPerFrames = args.average
     try:
@@ -172,25 +163,12 @@ def record(args, camera):
             output = npi.NPImage()
             lock = Lock()
 
-            #for i in range(nPicsPerFrames):
-
-            ttime = time.time()
             for i, fname in enumerate(camera.capture_continuous(output, 'yuv', use_video_port=False, burst=True)):
-                #output = npi.NPImage()
                 try:
 
-                    #camera.capture_continuous(output, 'yuv', use_video_port=False, burst=False)
-                    #time.sleep(0.01)
-
-                    #pictures_to_average[:,:,i] = output.get_data()
                     Thread(target=save_pic_to_frame, args=(output.get_data(), nPicsPerFrames, lock)).start()
 
                     number_of_skipped_frames = 0
-
-                    log((time.time() - ttime) / (i + 1))
-
-                    ttt += (time.time() - ttime) / (i + 1)
-                    iii += 1
 
                     if i == nPicsPerFrames-1:
                         break
