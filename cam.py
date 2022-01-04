@@ -108,7 +108,8 @@ def save_info(args, version):
 
     return nfo_path
 
-
+# Function to parallelize the computation of the new frame
+# save 0.2 to 0.3 seconds on capture time
 def save_pic_to_frame(new_pic, n, lock):
     lock.acquire()
     global current_frame
@@ -120,8 +121,6 @@ def record(args, camera):
 
 
     global current_frame
-    global test_counter
-
 
     nPicsPerFrames = args.average
     try:
@@ -132,28 +131,36 @@ def record(args, camera):
     number_of_skipped_frames = 0
 
     skip_frame = False
+
+    # Main loop for recording
     for k in range(args.start_frame, n_frames_total):
 
+        # (Re)Initialize the current frame
         current_frame = np.empty((2464, 3296), dtype=np.uint8)
 
+        # Check if the current frame is on time
         delay = time.time() - (initial_time + (k) * args.time_interval)
+
+        # If too early, wait until it is time to record
         if delay < 0:
             time.sleep(-delay)
             if args.vverbose:
                 log("Waiting for %fs" % -delay)
-        elif delay < 0.005:     # We need tolerance in this world
+        elif delay < 0.005:     # We need some tolerance in this world...
             pass
         else:
             if args.verbose:
                 #log('Frame %fs late' % -diff_time, begin="\n")
                 log('Delay : %fs' % delay)
 
-        # condition on k is useful if one just want one frame and does not care about time
+        # It the frame has more than one time interval of delay, it just skips the frame and directly
+        # goes to the next one
+        # The condition on k is useful if one just want one frame and does not care about time sync
         if delay >= args.time_interval and k < (n_frames_total-1) :
             skip_frame = True
 
         if not skip_frame:
-            start_time = time.time()
+            start_time = time.time()    # Starting time of the current frame
             if args.vverbose:
                 log("Starting capture of frame %d / %d" % (k + 1, n_frames_total))
             elif args.verbose:
@@ -166,13 +173,17 @@ def record(args, camera):
             for i, fname in enumerate(camera.capture_continuous(output, 'yuv', use_video_port=False, burst=True)):
                 try:
 
+                    # Send the computation and saving of the new pic to separated thread
                     Thread(target=save_pic_to_frame, args=(output.get_data(), nPicsPerFrames, lock)).start()
 
+                    # Frame has been taken so we can reinitialize the number of skipped frames
                     number_of_skipped_frames = 0
 
                     if i == nPicsPerFrames-1:
                         break
                     # print(np.max(pictures_to_average))
+                    
+                # That is some weird error that occurs randomly...
                 except picamera.exc.PiCameraRuntimeError as error:
                     log("Error 1 on frame %d" % k)
                     log(error)
