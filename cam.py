@@ -54,6 +54,7 @@ parser.add_argument("-th", type=int)
 args = parser.parse_args()
 
 
+
 local_tmp_dir = ".campy_local_save/"
 if args.output is not None:
     absolute_output_folder = pathlib.Path(get_folder_name(args.output[0])).absolute()
@@ -106,6 +107,12 @@ def save_info(args, version):
 
 def record(args, camera):
 
+    global ttt
+    global iii
+
+    ttt = 0
+    iii = 0
+
     nPicsPerFrames = args.average
     try:
         n_frames_total = args.timeout // args.time_interval
@@ -150,10 +157,18 @@ def record(args, camera):
 
                     camera.capture(output, 'yuv', use_video_port=False)
                     time.sleep(0.05)
+
+
                     # pictures_to_average = pictures_to_average + \
                     #                      cl.compressor(output.get_data(),args.r,args.th) // args.average
-                    pictures_to_average = pictures_to_average + output.get_data() // args.average
+                    new_pic = output.get_data() // args.average
+                    pictures_to_average = pictures_to_average + new_pic
                     number_of_skipped_frames = 0
+
+                    log((time.time() - start_time) / (i + 1))
+
+                    ttt += (time.time() - start_time) / (i + 1)
+                    iii += 1
                     # print(np.max(pictures_to_average))
                 except picamera.exc.PiCameraRuntimeError as error:
                     log("Error 1 on frame %d" % k)
@@ -260,6 +275,8 @@ def main():
 
         if args.verbose:
             log("Over.")
+
+        log(ttt / iii)
     # else:
     #     log("\nOops... Something went wrong.\n")
     except TimeoutError as e:
@@ -285,6 +302,8 @@ def main():
 
         if args.verbose:
             log("Over.")
+
+        log(ttt/iii)
 
 if __name__ == "__main__":
     main()
