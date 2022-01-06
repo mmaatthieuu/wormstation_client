@@ -170,8 +170,8 @@ def record(args, camera):
             output = npi.NPImage()
             lock = Lock()
 
-            for i, fname in enumerate(camera.capture_continuous(output, 'yuv', use_video_port=False, burst=True)):
-                try:
+            try:
+                for i, fname in enumerate(camera.capture_continuous(output, 'yuv', use_video_port=False, burst=True)):
 
                     # Send the computation and saving of the new pic to separated thread
                     Thread(target=save_pic_to_frame, args=(output.get_data(), nPicsPerFrames, lock)).start()
@@ -181,22 +181,22 @@ def record(args, camera):
 
                     if i == nPicsPerFrames-1:
                         break
-                    # print(np.max(pictures_to_average))
-                    
-                # That is some weird error that occurs randomly...
-                except picamera.exc.PiCameraRuntimeError as error:
-                    log("Error 1 on frame %d" % k)
-                    log(error)
-                    skip_frame = True
-                    if number_of_skipped_frames == 0:
-                        number_of_skipped_frames+=1
-                        continue
-                    else:
-                        log("Warning : Camera seems stuck... Trying to restart it")
-                        raise CrashTimeOutException(k)
-                    # sys.exit()
-                except RuntimeError:
-                    log("Error 2 on frame %d" % k)
+                # print(np.max(pictures_to_average))
+
+            # That is some weird error that occurs randomly...
+            except picamera.exc.PiCameraRuntimeError as error:
+                log("Error 1 on frame %d" % k)
+                log(error)
+                skip_frame = True
+                if number_of_skipped_frames == 0:
+                    number_of_skipped_frames+=1
+                    continue
+                else:
+                    log("Warning : Camera seems stuck... Trying to restart it")
+                    raise CrashTimeOutException(k)
+                # sys.exit()
+            except RuntimeError:
+                log("Error 2 on frame %d" % k)
 
             if args.output is not None:
                 save_image(current_frame, k, absolute_output_folder,
@@ -246,7 +246,7 @@ def main():
     if args.save_nfo:
         nfo_path = save_info(args, version)
 
-    picamera.PiCamera.CAPTURE_TIMEOUT = 2
+    picamera.PiCamera.CAPTURE_TIMEOUT = 1
 
     try:
 
