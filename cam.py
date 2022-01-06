@@ -171,7 +171,7 @@ def record(args, camera):
             lock = Lock()
 
             try:
-                for i, fname in enumerate(camera.capture_continuous(output, 'yuv', use_video_port=False, burst=True)):
+                for i, fname in enumerate(camera.capture_continuous(output, 'yuv', use_video_port=False, burst=False)):
 
                     # Send the computation and saving of the new pic to separated thread
                     Thread(target=save_pic_to_frame, args=(output.get_data(), nPicsPerFrames, lock)).start()
