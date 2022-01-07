@@ -125,6 +125,8 @@ def record(args, camera):
     nPicsPerFrames = args.average
     try:
         n_frames_total = int(args.timeout / args.time_interval)
+        if n_frames_total == 0:
+            n_frames_total = 1
     except ZeroDivisionError:
         n_frames_total = 1
 
