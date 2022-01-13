@@ -297,7 +297,7 @@ def main():
 
     # else:
     #     log("\nOops... Something went wrong.\n")
-    except TimeoutError as e:
+    except CrashTimeOutException as e:
 
         camera.close()
         log("Camera closed")
