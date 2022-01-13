@@ -188,6 +188,7 @@ def record(args, camera):
             # That is some weird error that occurs randomly...
             except picamera.exc.PiCameraRuntimeError as error:
                 log("Error 1 on frame %d" % k)
+                log("Frame %d skipped" % (k), begin="\n    WARNING    ")
                 log(error)
                 skip_frame = True
                 if number_of_skipped_frames == 0:
@@ -199,10 +200,11 @@ def record(args, camera):
                 # sys.exit()
             except RuntimeError:
                 log("Error 2 on frame %d" % k)
-
-            if args.output is not None:
-                save_image(current_frame, k, absolute_output_folder,
-                           output_filename, args.compress, n_frames_total, args.quality, args.average, version)
+            finally:
+                if args.output is not None:
+                    save_image(current_frame, k, absolute_output_folder,
+                               output_filename, args.compress, n_frames_total, args.quality, args.average, version,
+                               skip_frame)
 
             execTime = (time.time() - start_time)
             if args.vverbose:
@@ -232,6 +234,7 @@ def record(args, camera):
 
             """
 
+        """
         else:   # Skipping frame
             log("Skipping frame %d" % (k+1), begin="\n    WARNING    ")
             print("")
@@ -240,7 +243,7 @@ def record(args, camera):
                        skipped=True)
             skip_frame = False
 
-
+        """
 
 
 def main():
