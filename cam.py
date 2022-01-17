@@ -112,9 +112,10 @@ def save_info(args, version):
 # save 0.2 to 0.3 seconds on capture time
 def save_pic_to_frame(new_pic, n, lock):
     lock.acquire()
+
     global current_frame
     current_frame = current_frame + new_pic // n
-    lock.release()
+
 
 
 def record(args, camera):
@@ -173,16 +174,20 @@ def record(args, camera):
             lock = Lock()
 
             try:
+                threads = [None]*nPicsPerFrames
                 for i, fname in enumerate(camera.capture_continuous(output, 'yuv', use_video_port=False, burst=False)):
 
                     # Send the computation and saving of the new pic to separated thread
-                    Thread(target=save_pic_to_frame, args=(output.get_data(), nPicsPerFrames, lock)).start()
+                    threads[i] = Thread(target=save_pic_to_frame, args=(output.get_data(), nPicsPerFrames, lock))
+                    threads[i].start()
 
                     # Frame has been taken so we can reinitialize the number of skipped frames
                     number_of_skipped_frames = 0
 
                     if i == nPicsPerFrames-1:
                         break
+                for t in threads:
+                    t.join()
                 # print(np.max(pictures_to_average))
 
             # That is some weird error that occurs randomly...
