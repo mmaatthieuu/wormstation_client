@@ -150,7 +150,6 @@ def record(args, camera):
             if args.vverbose:
                 log("Waiting for %fs" % -delay)
         elif delay < 0.01:     # We need some tolerance in this world...
-            print("Delay too small")
             pass
         else:
             if args.verbose:
@@ -162,7 +161,7 @@ def record(args, camera):
         # The condition on k is useful if one just want one frame and does not care about time sync
         if delay >= args.time_interval and k < (n_frames_total-1) :
             skip_frame = True
-            print("frame skipped")
+            log("Delay too long : Frame %d skipped" % (k), begin="\n    WARNING    ")
 
         if not skip_frame:
             start_time = time.time()    # Starting time of the current frame
@@ -197,7 +196,7 @@ def record(args, camera):
             # That is some weird error that occurs randomly...
             except picamera.exc.PiCameraRuntimeError as error:
                 log("Error 1 on frame %d" % k)
-                log("Frame %d skipped" % (k), begin="\n    WARNING    ")
+                log("Timeout Error : Frame %d skipped" % (k), begin="\n    WARNING    ")
                 log(error)
                 skip_frame = True
                 if number_of_skipped_frames == 0:
