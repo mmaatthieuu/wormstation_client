@@ -132,11 +132,12 @@ def record(args, camera):
 
     number_of_skipped_frames = 0
 
-    skip_frame = False
+
 
     # Main loop for recording
     for k in range(args.start_frame, n_frames_total):
 
+        skip_frame = False
         # (Re)Initialize the current frame
         current_frame = np.empty((2464, 3296), dtype=np.uint8)
 
@@ -148,7 +149,8 @@ def record(args, camera):
             time.sleep(-delay)
             if args.vverbose:
                 log("Waiting for %fs" % -delay)
-        elif delay < 0.005:     # We need some tolerance in this world...
+        elif delay < 0.01:     # We need some tolerance in this world...
+            print("Delay too small")
             pass
         else:
             if args.verbose:
@@ -160,6 +162,7 @@ def record(args, camera):
         # The condition on k is useful if one just want one frame and does not care about time sync
         if delay >= args.time_interval and k < (n_frames_total-1) :
             skip_frame = True
+            print("frame skipped")
 
         if not skip_frame:
             start_time = time.time()    # Starting time of the current frame
@@ -206,15 +209,15 @@ def record(args, camera):
                 # sys.exit()
             except RuntimeError:
                 log("Error 2 on frame %d" % k)
-            finally:
-                if args.output is not None:
-                    save_image(current_frame, k, absolute_output_folder,
-                               output_filename, args.compress, n_frames_total, args.quality, args.average, version,
-                               skip_frame)
 
-            execTime = (time.time() - start_time)
-            if args.vverbose:
-                log("Finished capture of frame %d in %fs" % (k + 1, execTime))
+        if args.output is not None:
+            save_image(current_frame, k, absolute_output_folder,
+                       output_filename, args.compress, n_frames_total, args.quality, args.average, version,
+                       skip_frame)
+
+        execTime = (time.time() - start_time)
+        if args.vverbose:
+            log("Finished capture of frame %d in %fs" % (k + 1, execTime))
 
 
             """
