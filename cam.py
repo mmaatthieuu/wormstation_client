@@ -163,18 +163,19 @@ def record(args, camera):
             skip_frame = True
             log("Delay too long : Frame %d skipped" % (k), begin="\n    WARNING    ")
 
-        if not skip_frame:
-            start_time = time.time()    # Starting time of the current frame
-            if args.vverbose:
-                log("Starting capture of frame %d / %d" % (k + 1, n_frames_total))
-            elif args.verbose:
-                print("\r[%s] : Starting capture of frame %d / %d" %
-                      (str(datetime.datetime.now()), k + 1, n_frames_total), end="")
+        try:
+            if not skip_frame:
+                start_time = time.time()    # Starting time of the current frame
+                if args.vverbose:
+                    log("Starting capture of frame %d / %d" % (k + 1, n_frames_total))
+                elif args.verbose:
+                    print("\r[%s] : Starting capture of frame %d / %d" %
+                          (str(datetime.datetime.now()), k + 1, n_frames_total), end="")
 
-            output = npi.NPImage()
-            lock = Lock()
+                output = npi.NPImage()
+                lock = Lock()
 
-            try:
+
                 threads = [None]*nPicsPerFrames
                 for i, fname in enumerate(camera.capture_continuous(output, 'yuv', use_video_port=False, burst=False)):
 
@@ -194,25 +195,26 @@ def record(args, camera):
                 # print(np.max(pictures_to_average))
 
             # That is some weird error that occurs randomly...
-            except picamera.exc.PiCameraRuntimeError as error:
-                log("Error 1 on frame %d" % k)
-                log("Timeout Error : Frame %d skipped" % (k), begin="\n    WARNING    ")
-                log(error)
-                skip_frame = True
-                if number_of_skipped_frames == 0:
-                    number_of_skipped_frames+=1
-                    continue
-                else:
-                    log("Warning : Camera seems stuck... Trying to restart it")
-                    raise CrashTimeOutException(k)
-                # sys.exit()
-            except RuntimeError:
-                log("Error 2 on frame %d" % k)
+        except picamera.exc.PiCameraRuntimeError as error:
+            log("Error 1 on frame %d" % k)
+            log("Timeout Error : Frame %d skipped" % (k), begin="\n    WARNING    ")
+            log(error)
+            skip_frame = True
+            if number_of_skipped_frames == 0:
+                number_of_skipped_frames+=1
+                continue
+            else:
+                log("Warning : Camera seems stuck... Trying to restart it")
+                raise CrashTimeOutException(k)
+            # sys.exit()
+        except RuntimeError:
+            log("Error 2 on frame %d" % k)
 
-        if args.output is not None:
-            save_image(current_frame, k, absolute_output_folder,
-                       output_filename, args.compress, n_frames_total, args.quality, args.average, version,
-                       skip_frame)
+        finally:
+            if args.output is not None:
+                save_image(current_frame, k, absolute_output_folder,
+                           output_filename, args.compress, n_frames_total, args.quality, args.average, version,
+                           skip_frame)
 
         execTime = (time.time() - start_time)
         if args.vverbose:
