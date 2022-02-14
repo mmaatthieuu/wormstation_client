@@ -22,6 +22,7 @@ import src.NPImage as npi
 import datetime
 
 from src.cam_lib import *
+from camera import Camera
 
 from src.CrashTimeOutException import CrashTimeOutException
 
@@ -227,7 +228,7 @@ def record(args, camera):
 def main():
     parameters = Parameters()
 
-
+    c = Camera(parameters)
 
     quit()
     init()
