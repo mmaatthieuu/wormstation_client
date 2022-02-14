@@ -6,4 +6,8 @@ class Parameters(dict):
         with open(filename) as f:
             data = json.load(f)
 
-        super().__init__(data)
+        super(Parameters, self).__init__(data)
+
+
+    def save(self, file_path):
+        pass
