@@ -15,7 +15,7 @@ import os
 import picamera
 
 
-from set_picamera_gain import set_analog_gain, set_digital_gain
+from .set_picamera_gain import set_analog_gain, set_digital_gain
 
 
 
@@ -169,6 +169,8 @@ def print_args(args):
 def compress(folder_name, dest_path):
     pid = psutil.Process(os.getpid())
 
+
+
     pid.nice(19)
     log("Starting compression of %s" % folder_name)
 
@@ -177,18 +179,13 @@ def compress(folder_name, dest_path):
     #os.system(command_string)
     subprocess.run(call_args)
 
-    # with tarfile.open(folder_name + ".tgz", "w:gz") as tar:
-    #     for file in os.listdir(pathlib.Path(folder_name)):
-    #         tar.add(os.path.join(folder_name, file), arcname=file)
-    #         time.sleep(0.1)
 
     log("\n")
     log("Compression of %s done" % folder_name)
-    # !!! That is taking much resources !!! -> subprocess ?
     try:
-        #shutil.move(folder_name+".tgz", "%s/%s.tgz" % (dest_path, folder_name))
-        #shutil.rmtree(folder_name)
+
         subprocess.run(['mv', '%s.tgz' % folder_name, '%s/%s.tgz' % (dest_path, folder_name)])
+        #subprocess.run(['smbclient', f'{smbservice}', '-W', f'{workgroup}', '-A', f'{cred_file}', '-D', f'{main_dir}'])
         subprocess.run(['rm', '-rf', '%s' % folder_name])
     except OSError as error:
         log("Failed to move and/or delete folder")
@@ -197,12 +194,19 @@ def compress(folder_name, dest_path):
     log("%s moved to destination" % folder_name)
 
 
-def compressor(x, ratio, threshold):
-    y1 = np.copy(x)
-    y2 = np.copy(x)
-    y1[y1>=threshold] = 0
-    #y2[y2<threshold] = 0
-    y2 = np.array(ratio * y2 + threshold * (1 - ratio), dtype=np.uint8)
-    y2[y1<threshold]=0
-    return y1+y2
+def smbsend(file_to_send, remote_destination_folder="."):
+    smbservice = "//lpbsnas1.epfl.ch/LPBS"
+    workgroup = "INTRANET"
+    cred_file = "/etc/.smbcreds"
+    main_dir = f"Users/Matthieu-Schmidt/{remote_destination_folder}"
+
+    command = f'put {file_to_send}'
+
+    ok = subprocess.run(['smbclient', f'{smbservice}', '-W', f'{workgroup}', '-A', f'{cred_file}', '-D', f'{main_dir}',
+                        '-c', f'{command}'])
+
+    return ok
+
+
+
 

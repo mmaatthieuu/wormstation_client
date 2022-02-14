@@ -13,13 +13,13 @@ from multiprocessing import Process
 from threading import Thread,Lock
 from queue import Queue
 
-import NPImage as npi
+import src.NPImage as npi
 
 import datetime
 
-from cam_lib import *
+from src.cam_lib import *
 
-from CrashTimeOutException import CrashTimeOutException
+from src.CrashTimeOutException import CrashTimeOutException
 
 parser = argparse.ArgumentParser()
 
@@ -219,41 +219,6 @@ def record(args, camera):
         execTime = (time.time() - start_time)
         if args.vverbose:
             log("Finished capture of frame %d in %fs" % (k + 1, execTime))
-
-
-            """
-            
-            delay not very precise the first time
-            
-            """
-
-            """
-            delay = time.time() - (initial_time + (k+1) * args.time_interval)
-            print(delay)
-            if diff_time - delay > 0:
-                sleep_time = args.time_interval - execTime - delay
-                if args.vverbose:
-                    log("Waiting for %fs" % sleep_time)
-                time.sleep(sleep_time)
-            else:
-                # delay -= diff_time
-
-                if args.verbose:
-                    log('Frame %fs late' % -diff_time, begin="\n")
-                    log('Delay : %fs' % delay)
-
-            """
-
-        """
-        else:   # Skipping frame
-            log("Skipping frame %d" % (k+1), begin="\n    WARNING    ")
-            print("")
-            save_image(current_frame, k, absolute_output_folder,
-                       output_filename, args.compress, n_frames_total, args.quality, args.average, version,
-                       skipped=True)
-            skip_frame = False
-
-        """
 
 
 def main():
