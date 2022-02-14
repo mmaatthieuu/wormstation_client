@@ -1,0 +1,22 @@
+{
+  "verbosity_level" :	1,
+  "timeout" : 			0,
+  "time_interval" : 	2.5,
+  "average" : 			4,
+  "quality" : 			90,
+  "ISO" :				0,
+  "shutter_speed" :		0,
+  "brightness" :		50,
+  "compress" : 			2000,
+  "start_frame" :		0,
+  
+  "use_samba" :			true,
+  "smb_service" :		"//lpbsnas1.epfl.ch/LPBS",
+  "workgroup" :			"INTRANET",
+  "credentials_file" :	"/etc/.smbcreds",
+  "smb_dir" : 			"Users/Matthieu-Schmidt/WORMSTATION",
+  
+  "local_output" :		"none",
+  
+  "capture_timeout" :	1.0
+}

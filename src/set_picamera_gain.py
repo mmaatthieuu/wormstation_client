@@ -1,3 +1,5 @@
+# source : https://gist.github.com/rwb27/a23808e9f4008b48de95692a38ddaa08
+
 from __future__ import print_function
 
 import picamera
@@ -70,4 +72,3 @@ if __name__ == "__main__":
         except KeyboardInterrupt:
             print("Stopping...")
 
-# source : https://gist.github.com/rwb27/a23808e9f4008b48de95692a38ddaa08

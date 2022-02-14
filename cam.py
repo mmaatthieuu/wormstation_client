@@ -13,6 +13,10 @@ from multiprocessing import Process
 from threading import Thread,Lock
 from queue import Queue
 
+from parameters import Parameters
+
+import json
+
 import src.NPImage as npi
 
 import datetime
@@ -56,7 +60,6 @@ parser.add_argument("-r", type=float)
 parser.add_argument("-th", type=int)
 
 args = parser.parse_args()
-
 
 
 local_tmp_dir = ".campy_local_save/"
@@ -222,6 +225,11 @@ def record(args, camera):
 
 
 def main():
+    parameters = Parameters()
+
+
+
+    quit()
     init()
     if args.save_nfo:
         nfo_path = save_info(args, version)
