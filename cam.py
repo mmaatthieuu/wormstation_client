@@ -14,6 +14,7 @@ from threading import Thread,Lock
 from queue import Queue
 
 import src.NPImage as npi
+from src.tlc5940.tlc import tlc5940
 
 import datetime
 
@@ -72,7 +73,11 @@ git_check = subprocess.run(['git', '--git-dir=/home/matthieu/piworm/.git', 'rev-
                             '--all', '--abbrev-commit', '-n', '1'], text=True, capture_output=True)
 version = git_check.stdout
 
+
+
 def init():
+
+
 
     if args.vverbose:
         args.verbose = True
@@ -89,6 +94,28 @@ def init():
             # os.remove(".campy_local_save/*")
         os.chdir(local_tmp_dir)
 
+def leds_on(stop_leds):
+    leds = tlc5940(blankpin=27,
+                   progpin=22,
+                   latchpin=17,
+                   gsclkpin=18,
+                   serialpin=23,
+                   clkpin=24)
+
+    leds.initialise()
+
+    while True:
+        for led in range(0, 16):
+            leds.set_grey(led, 64)
+
+        leds.write_dot_values()
+        leds.pulse_clk()
+
+        if stop_leds():
+            break
+
+    leds.blank(1)
+    leds.cleanup()
 
 def save_info(args, version):
 
@@ -121,6 +148,10 @@ def record(args, camera):
 
 
     global current_frame
+
+
+
+
 
     nPicsPerFrames = args.average
     try:
@@ -221,8 +252,15 @@ def record(args, camera):
             log("Finished capture of frame %d in %fs" % (k + 1, execTime))
 
 
+
+
 def main():
     init()
+
+    stop_leds = False
+    led_thread = Thread(target=leds_on, args=(lambda: stop_leds,))
+    led_thread.start()
+
     if args.save_nfo:
         nfo_path = save_info(args, version)
 
@@ -288,6 +326,10 @@ def main():
     else:
 
         subprocess.run(['pkill', 'cpulimit'])
+
+        stop_leds = True
+        led_thread.join()
+        print('thread killed')
 
         if args.verbose:
             log("Closing camera...")
