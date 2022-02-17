@@ -194,9 +194,10 @@ def record(args, camera):
             skip_frame = True
             log("Delay too long : Frame %d skipped" % (k), begin="\n    WARNING    ")
 
+        start_time = time.time()  # Starting time of the current frame
         try:
             if not skip_frame:
-                start_time = time.time()    # Starting time of the current frame
+
                 if args.vverbose:
                     log("Starting capture of frame %d / %d" % (k + 1, n_frames_total))
                 elif args.verbose:
