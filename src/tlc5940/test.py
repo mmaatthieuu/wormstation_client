@@ -14,12 +14,14 @@ try:
     leds.blank(0)
 
     for led in range(0, 16):
-        leds.set_grey(led, 64)
+        #leds.set_dot(led, 1)
+        leds.set_grey(led, 1)
 
 
 
     while 1:
-        leds.write_dot_values()
+        #leds.write_dot_values()
+        leds.write_grey_values()
         leds.pulse_clk()
 
 except KeyboardInterrupt:

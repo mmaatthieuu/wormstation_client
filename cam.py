@@ -53,6 +53,7 @@ parser.add_argument("-sf", "--start-frame", help="input the frame number to star
                     type=int, default=0)
 parser.add_argument("-nfo", "--save-nfo", help="Save an nfo file with all recording parameters",
                     action="store_true")
+parser.add_argument("-l", "--led-intensity", help="set light intensity 0-4095", type=int, default=4095)
 parser.add_argument("-r", type=float)
 parser.add_argument("-th", type=int)
 
@@ -104,11 +105,15 @@ def leds_on(stop_leds):
 
     leds.initialise()
 
+    print(args.led_intensity)
+
     while True:
         for led in range(0, 16):
-            leds.set_grey(led, 64)
+            leds.set_grey(led, args.led_intensity)
+            leds.set_dot(led,1)
 
         leds.write_dot_values()
+        leds.write_grey_values()
         leds.pulse_clk()
 
         if stop_leds():
@@ -265,7 +270,7 @@ def main():
     if args.save_nfo:
         nfo_path = save_info(args, version)
 
-    picamera.PiCamera.CAPTURE_TIMEOUT = 1
+    picamera.PiCamera.CAPTURE_TIMEOUT = 10
 
     try:
 
@@ -273,6 +278,8 @@ def main():
 
         camera = cam_init(iso=args.iso, shutter_speed=args.shutter_speed, brightness=args.brightness,
                  verbose=args.verbose)
+
+
 
 
         if args.preview:
@@ -295,7 +302,7 @@ def main():
         initial_time = time.time()
 
         record(args=args, camera=camera)
-
+        print("shutter speed : %d" % camera.exposure_speed)
 
     except KeyboardInterrupt:
         log("\nScript interrupted by user")

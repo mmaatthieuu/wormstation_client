@@ -41,7 +41,7 @@ def log(log_msg, begin="", end="\n"):
 def cam_init(iso, shutter_speed, brightness, verbose):
 
     #cam = picamera.PiCamera(resolution='3296x2464')
-    cam = picamera.PiCamera(resolution='3296x2464')
+    cam = picamera.PiCamera(resolution='3296x2464',framerate=0.5)
     cam.iso = iso
 
     if verbose:
@@ -49,9 +49,11 @@ def cam_init(iso, shutter_speed, brightness, verbose):
     time.sleep(1)
 
     # fix the auto white balance gains at their current values
-    g = cam.awb_gains
-    cam.awb_mode = "off"
-    cam.awb_gains = g
+    #g = cam.awb_gains
+    #cam.awb_mode = "off"
+    #cam.awb_gains = g
+
+    cam.exposure_mode = "off"
 
     # fix the shutter speed
     cam.shutter_speed = shutter_speed
@@ -67,7 +69,11 @@ def cam_init(iso, shutter_speed, brightness, verbose):
         cam.shutter_speed = shutter_speed
         cam.exposure_mode = 'off'
     """
+
+
+
     time.sleep(0.5)
+
     cam.brightness = brightness
 
     return cam
