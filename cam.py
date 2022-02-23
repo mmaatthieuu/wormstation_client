@@ -8,6 +8,7 @@ import picamera
 import argparse
 import os.path
 import subprocess
+import socket
 from multiprocessing.pool import ThreadPool
 from multiprocessing import Process
 from threading import Thread,Lock
@@ -53,6 +54,8 @@ parser.add_argument("-sf", "--start-frame", help="input the frame number to star
                     type=int, default=0)
 parser.add_argument("-nfo", "--save-nfo", help="Save an nfo file with all recording parameters",
                     action="store_true")
+parser.add_argument("-a", "--annotate-frames", help="bool, overlay date, time and device name on frames",
+                     action="store_true")
 parser.add_argument("-l", "--led-intensity", help="set light intensity 0-4095", type=int, default=4095)
 parser.add_argument("-r", type=float)
 parser.add_argument("-th", type=int)
@@ -212,6 +215,11 @@ def record(args, camera):
                 output = npi.NPImage()
                 lock = Lock()
 
+                if args.annotate_frames:
+                    string_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    string_to_overlay = "%s | %s" %(socket.gethostname(),string_time)
+
+                    camera.annotate_text(string_to_overlay)
 
                 threads = [None]*nPicsPerFrames
                 for i, fname in enumerate(camera.capture_continuous(output, 'yuv', use_video_port=False, burst=False)):
