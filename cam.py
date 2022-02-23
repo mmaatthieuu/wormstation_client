@@ -219,7 +219,7 @@ def record(args, camera):
                     string_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                     string_to_overlay = "%s | %s" %(socket.gethostname(),string_time)
 
-                    camera.annotate_text(string_to_overlay)
+                    camera.annotate_text = string_to_overlay
 
                 threads = [None]*nPicsPerFrames
                 for i, fname in enumerate(camera.capture_continuous(output, 'yuv', use_video_port=False, burst=False)):
