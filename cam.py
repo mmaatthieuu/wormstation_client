@@ -8,6 +8,7 @@ import picamera
 import argparse
 import os.path
 import subprocess
+import socket
 from multiprocessing.pool import ThreadPool
 from multiprocessing import Process
 from threading import Thread,Lock
@@ -18,6 +19,7 @@ from parameters import Parameters
 import json
 
 import src.NPImage as npi
+from src.tlc5940.tlc import tlc5940
 
 import datetime
 
@@ -57,6 +59,9 @@ parser.add_argument("-sf", "--start-frame", help="input the frame number to star
                     type=int, default=0)
 parser.add_argument("-nfo", "--save-nfo", help="Save an nfo file with all recording parameters",
                     action="store_true")
+parser.add_argument("-a", "--annotate-frames", help="bool, overlay date, time and device name on frames",
+                     action="store_true")
+parser.add_argument("-l", "--led-intensity", help="set light intensity 0-4095", type=int, default=4095)
 parser.add_argument("-r", type=float)
 parser.add_argument("-th", type=int)
 
@@ -76,7 +81,11 @@ git_check = subprocess.run(['git', '--git-dir=/home/matthieu/piworm/.git', 'rev-
                             '--all', '--abbrev-commit', '-n', '1'], text=True, capture_output=True)
 version = git_check.stdout
 
+
+
 def init():
+
+
 
     if args.vverbose:
         args.verbose = True
@@ -93,6 +102,32 @@ def init():
             # os.remove(".campy_local_save/*")
         os.chdir(local_tmp_dir)
 
+def leds_on(stop_leds):
+    leds = tlc5940(blankpin=27,
+                   progpin=22,
+                   latchpin=17,
+                   gsclkpin=18,
+                   serialpin=23,
+                   clkpin=24)
+
+    leds.initialise()
+
+    print(args.led_intensity)
+
+    while True:
+        for led in range(0, 16):
+            leds.set_grey(led, args.led_intensity)
+            leds.set_dot(led,1)
+
+        leds.write_dot_values()
+        leds.write_grey_values()
+        leds.pulse_clk()
+
+        if stop_leds():
+            break
+
+    leds.blank(1)
+    leds.cleanup()
 
 def save_info(args, version):
 
@@ -125,6 +160,10 @@ def record(args, camera):
 
 
     global current_frame
+
+
+
+
 
     nPicsPerFrames = args.average
     try:
@@ -167,9 +206,10 @@ def record(args, camera):
             skip_frame = True
             log("Delay too long : Frame %d skipped" % (k), begin="\n    WARNING    ")
 
+        start_time = time.time()  # Starting time of the current frame
         try:
             if not skip_frame:
-                start_time = time.time()    # Starting time of the current frame
+
                 if args.vverbose:
                     log("Starting capture of frame %d / %d" % (k + 1, n_frames_total))
                 elif args.verbose:
@@ -179,6 +219,11 @@ def record(args, camera):
                 output = npi.NPImage()
                 lock = Lock()
 
+                if args.annotate_frames:
+                    string_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    string_to_overlay = "%s | %s" %(socket.gethostname(),string_time)
+
+                    camera.annotate_text = string_to_overlay
 
                 threads = [None]*nPicsPerFrames
                 for i, fname in enumerate(camera.capture_continuous(output, 'yuv', use_video_port=False, burst=False)):
@@ -225,6 +270,8 @@ def record(args, camera):
             log("Finished capture of frame %d in %fs" % (k + 1, execTime))
 
 
+
+
 def main():
     parameters = Parameters()
 
@@ -232,10 +279,15 @@ def main():
 
     quit()
     init()
+
+    stop_leds = False
+    led_thread = Thread(target=leds_on, args=(lambda: stop_leds,))
+    led_thread.start()
+
     if args.save_nfo:
         nfo_path = save_info(args, version)
 
-    picamera.PiCamera.CAPTURE_TIMEOUT = 1
+    picamera.PiCamera.CAPTURE_TIMEOUT = 10
 
     try:
 
@@ -243,6 +295,8 @@ def main():
 
         camera = cam_init(iso=args.iso, shutter_speed=args.shutter_speed, brightness=args.brightness,
                  verbose=args.verbose)
+
+
 
 
         if args.preview:
@@ -265,7 +319,7 @@ def main():
         initial_time = time.time()
 
         record(args=args, camera=camera)
-
+        print("shutter speed : %d" % camera.exposure_speed)
 
     except KeyboardInterrupt:
         log("\nScript interrupted by user")
@@ -297,6 +351,10 @@ def main():
     else:
 
         subprocess.run(['pkill', 'cpulimit'])
+
+        stop_leds = True
+        led_thread.join()
+        print('thread killed')
 
         if args.verbose:
             log("Closing camera...")
