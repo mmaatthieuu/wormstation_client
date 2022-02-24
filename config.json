@@ -9,6 +9,8 @@
   "brightness" :		50,
   "compress" : 			2000,
   "start_frame" :		0,
+  "LED_intensity" :     1,
+  "annotate_frames" :   true,
   
   "use_samba" :			true,
   "smb_service" :		"//lpbsnas1.epfl.ch/LPBS",
@@ -17,6 +19,7 @@
   "smb_dir" : 			"Users/Matthieu-Schmidt/WORMSTATION",
   
   "local_output" :		"none",
+  "local_tmp_dir" :     ".wormstation_tmp",
   
-  "capture_timeout" :	1.0
+  "capture_timeout" :	3.0
 }

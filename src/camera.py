@@ -11,6 +11,8 @@ class Camera(picamera.PiCamera):
 
         self.iso = parameters["ISO"]
 
+        picamera.PiCamera.CAPTURE_TIMEOUT = parameters["capture_timeout"]
+
         if parameters["verbosity_level"] > 0:
             log("Starting camera...")
         time.sleep(1)
@@ -26,8 +28,8 @@ class Camera(picamera.PiCamera):
         set_digital_gain(self, 1)
 
         time.sleep(0.5)
-        #self.brightness = parameters["brightness"]
-        print(self.brightness)
+        self.brightness = parameters["brightness"]
+        #print(self.brightness)
 
     def __del__(self):
         self.close()

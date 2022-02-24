@@ -24,7 +24,7 @@ from src.tlc5940.tlc import tlc5940
 import datetime
 
 from src.cam_lib import *
-from camera import Camera
+from src.record import Recorder
 
 from src.CrashTimeOutException import CrashTimeOutException
 
@@ -76,7 +76,7 @@ if args.output is not None:
 # print(absolute_output_folder)
 # print(output_filename)
 
-
+# TODO make that git check better
 git_check = subprocess.run(['git', '--git-dir=/home/matthieu/piworm/.git', 'rev-list',
                             '--all', '--abbrev-commit', '-n', '1'], text=True, capture_output=True)
 version = git_check.stdout
@@ -273,10 +273,12 @@ def record(args, camera):
 
 
 def main():
-    parameters = Parameters()
+    print(os.getcwd())
+    parameters = Parameters("./piworm/config.json")
 
-    c = Camera(parameters)
+    recorder = Recorder(parameters=parameters)
 
+    print("end")
     quit()
     init()
 
