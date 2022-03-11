@@ -270,7 +270,7 @@ def main():
     if args.save_nfo:
         nfo_path = save_info(args, version)
 
-    picamera.PiCamera.CAPTURE_TIMEOUT = 10
+    picamera.PiCamera.CAPTURE_TIMEOUT = 3
 
     try:
 

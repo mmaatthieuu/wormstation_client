@@ -1,5 +1,6 @@
 from tlc import tlc5940
 import time
+import sys
 
 leds = tlc5940(blankpin = 27,
                progpin = 22,
@@ -13,14 +14,16 @@ try:
 
     leds.blank(0)
 
-    for led in range(0, 16):
+#    for led in range(0, 16):
         #leds.set_dot(led, 1)
-        leds.set_grey(led, 1)
+#        leds.set_grey(led, int(sys.argv[1]))
 
 
 
     while 1:
         #leds.write_dot_values()
+        for led in range(16):
+            leds.set_grey(led, int(sys.argv[1]))
         leds.write_grey_values()
         leds.pulse_clk()
 
