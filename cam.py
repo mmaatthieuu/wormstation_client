@@ -77,17 +77,23 @@ git_check = subprocess.run(['git', '--git-dir=/home/matthieu/piworm/.git', 'rev-
                             '--all', '--abbrev-commit', '-n', '1'], text=True, capture_output=True)
 version = git_check.stdout
 
+leds = tlc5940(blankpin=27,
+               progpin=22,
+               latchpin=17,
+               gsclkpin=18,
+               serialpin=23,
+               clkpin=24)
 
 
 def init():
-
-
 
     if args.vverbose:
         args.verbose = True
 
     if args.verbose:
         print(print_args(args))
+
+    leds.initialise()
 
     if args.compress is not None:
         try:
@@ -98,32 +104,15 @@ def init():
             # os.remove(".campy_local_save/*")
         os.chdir(local_tmp_dir)
 
-def leds_on(stop_leds):
-    leds = tlc5940(blankpin=27,
-                   progpin=22,
-                   latchpin=17,
-                   gsclkpin=18,
-                   serialpin=23,
-                   clkpin=24)
-
-    leds.initialise()
-
-    print(args.led_intensity)
+def leds_on():
 
     while True:
         for led in range(0, 16):
             leds.set_grey(led, args.led_intensity)
-            leds.set_dot(led,1)
 
-        leds.write_dot_values()
         leds.write_grey_values()
         leds.pulse_clk()
 
-        if stop_leds():
-            break
-
-    leds.blank(1)
-    leds.cleanup()
 
 def save_info(args, version):
 
@@ -271,9 +260,8 @@ def record(args, camera):
 def main():
     init()
 
-    stop_leds = False
-    led_thread = Thread(target=leds_on, args=(lambda: stop_leds,))
-    led_thread.start()
+    led_proc = Process(target=leds_on, args=(), daemon=True)
+    led_proc.start()
 
     if args.save_nfo:
         nfo_path = save_info(args, version)
@@ -317,6 +305,7 @@ def main():
 
         subprocess.run(['pkill', 'cpulimit'])
 
+
         if args.verbose:
             log("Closing camera...")
         camera.close()
@@ -343,8 +332,13 @@ def main():
 
         subprocess.run(['pkill', 'cpulimit'])
 
-        stop_leds = True
-        led_thread.join()
+        led_proc.kill()
+        time.sleep(0.1)
+        leds.blank(1)
+        leds.cleanup()
+
+        #led_p.kill()
+
         print('thread killed')
 
         if args.verbose:

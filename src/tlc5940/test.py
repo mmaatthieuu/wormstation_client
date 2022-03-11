@@ -14,12 +14,6 @@ try:
 
     leds.blank(0)
 
-#    for led in range(0, 16):
-        #leds.set_dot(led, 1)
-#        leds.set_grey(led, int(sys.argv[1]))
-
-
-
     while 1:
         #leds.write_dot_values()
         for led in range(16):
@@ -30,6 +24,7 @@ try:
 except KeyboardInterrupt:
     pass
 
+print("dying...")
 leds.blank(1)
 leds.cleanup() # may cause odd flickering due to default Rpi pin settings.
                # Comment out if necessary
