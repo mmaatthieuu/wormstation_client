@@ -171,7 +171,7 @@ def record(args, camera):
         current_frame = np.empty((2464, 3296), dtype=np.uint8)
 
         # Check if the current frame is on time
-        delay = time.time() - (initial_time + (k) * args.time_interval)
+        delay = time.time() - (initial_time + (k) * args.time_interval) + args.start_frame * args.time_interval
 
         # If too early, wait until it is time to record
         if delay < 0:

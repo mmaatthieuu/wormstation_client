@@ -96,13 +96,13 @@ def save_image(picture_array, k, output_folder, output_filename, compress_step, 
         part = k // compress_step
         current_dir = "part%02d" % part
 
-        if k % compress_step == 0:
-            try:
-                os.mkdir(current_dir)
-                #log("\n%s created" % current_dir)
-            except FileExistsError:
-                # log("\n%s already exists" % current_dir)
-                pass
+        #if k % compress_step == 0:
+        try:
+            os.mkdir(current_dir)
+            #log("\n%s created" % current_dir)
+        except FileExistsError:
+            # log("\n%s already exists" % current_dir)
+            pass
 
         save_path = os.path.join(current_dir, filename)
         image.save(save_path, quality=quality)
