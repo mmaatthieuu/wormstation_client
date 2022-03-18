@@ -2,16 +2,23 @@ import numpy as np
 import time
 from datetime import datetime
 from socket import gethostname
+from PIL import Image as im
+
 
 import picamera
 
+from math import log10, ceil
 
 from threading import Thread,Lock
+import multiprocessing
 
+import psutil
+import pathlib
 
 from src.camera import Camera
 from src.tlc5940.tlc import tlc5940
 import os
+import subprocess
 import sys
 from pathlib import Path
 from src.utils import log
@@ -25,7 +32,7 @@ class Recorder:
     """
     Class Recorder
     """
-    def __init__(self, parameters):
+    def __init__(self, parameters, git_version):
         """
         Constructor
         """
@@ -35,49 +42,57 @@ class Recorder:
         # Create the camera object with the input parameters
         self.camera = Camera(parameters=self.parameters)
 
-
-        self.leds = tlc5940(blankpin=27,
-                            progpin=22,
-                            latchpin=17,
-                            gsclkpin=18,
-                            serialpin=23,
-                            clkpin=24)
-
-        self.leds.initialise()
-
         self.current_frame = None
         self.current_frame_number = 0
         self.number_of_skipped_frames = 0
-        self.n_frames_total = 0
+        self.n_frames_total = self.compute_total_number_of_frames()
+
+        self.compress_step = self.parameters["compress"]
+
         self.skip_frame = False
+
+        self.output_filename = self.read_output_filename()
 
         self.initial_time = 0
         self.delay = 0
         self.start_time_current_frame = 0
 
+        self.git_version = git_version
+
+        print(self.git_version)
+
         #self.output = None
         self.output_lock = Lock()
 
+        subprocess.run(['cpulimit', '-P', '/usr/bin/gzip', '-l', '10', '-b', '-q'])
 
+        # TODO pool instead of single process
+        self.compress_process = None
+
+    def __del__(self):
+        log("Closing recorder")
+        subprocess.run(['pkill', 'cpulimit'])
+        del self.camera
 
     def start_recording(self):
         """
         Main recording function
         """
+        # TODO : save json config
+        # TODO : add git number to json file and maybe add check if git version is the same as current one ?
+        # TODO : confirm parameters & check if folder already exists
+        # TODO : check if samba config is working
 
         # Go to home directory
+        print("#DEBUG go to rec folder")
         self.go_to_tmp_recording_folder()
 
         # Compute the total number of frame from the recording time and time interval between frames
-        try:
-            self.n_frames_total = int(self.parameters["timeout"]/self.parameters["time_interval"])
-            if self.n_frames_total == 0:
-                self.n_frames_total = 1
-        except ZeroDivisionError:
-            self.n_frames_total = 1
+
 
         self.initial_time = time.time()
 
+        #self.create_output_folder()
 
 
         # Main recording loop
@@ -97,27 +112,49 @@ class Recorder:
 
                     self.annotate_frame()
 
-                    self.capture_frame()
+                    self.async_frame_capture()
 
             except picamera.exc.PiCameraRuntimeError as error:
                 log("Error 1 on frame %d" % self.current_frame_number)
-                log("Timeout Error : Frame %d skipped" % self.current_frame_number, begin="\n    WARNING    ")
+                log("Timeout Error : Frame %d skipped" % self.current_frame_number, begin="\n    WARNING    ", end="\n")
                 log(error)
-                skip_frame = True
+                self.skip_frame = True
                 if self.number_of_skipped_frames == 0:
                     self.number_of_skipped_frames += 1
                     continue
+                # Already one frame has been skipped -> camera probably stuck
                 else:
                     log("Warning : Camera seems stuck... Trying to restart it")
-                    raise CrashTimeOutException(self.current_frame_number)
+                    del self.camera
+                    self.camera = Camera(parameters=self.parameters)
+                    #raise CrashTimeOutException(self.current_frame_number)
                 # sys.exit()
+            except RuntimeError:
+                # Never occurs actually
+                log("Error 2 on frame %d" % self.current_frame_number)
+
+            finally:
+                if self.get_last_save_path() is not None:
+                    # TODO : other thread for saving
+                    self.save_frame()
+
+                    if self.is_time_for_compression():
+                        print("#DEBUG compress now")
+                        self.start_async_compression_and_upload()
+
+                #create link to last frame
+                self.create_symlink_to_last_frame()
+        print("#DEBUG recording done")
+
 
 
 
     def wait_or_catchup_by_skipping_frames(self):
         # Wait
         # Check if the current frame is on time
-        self.delay = time.time() - (self.initial_time + self.current_frame_number * self.parameters["time_interval"])
+        self.delay = time.time() - (self.initial_time +
+                                    self.current_frame_number * self.parameters["time_interval"]) + \
+                     self.parameters["start_frame"] * self.parameters["time_interval"]
 
         # If too early, wait until it is time to record
         if self.delay < 0:
@@ -125,8 +162,9 @@ class Recorder:
             if self.parameters["verbosity_level"] >= 2:
                 log("Waiting for %fs" % -self.delay)
         elif self.delay < 0.01:  # We need some tolerance in this world...
-            pass
+            pass # And go on directly with frame capture
         else:
+            # Frame late : log delay
             if self.parameters["verbosity_level"] >= 1:
                 # log('Frame %fs late' % -diff_time, begin="\n")
                 log('Delay : %fs' % self.delay)
@@ -134,7 +172,7 @@ class Recorder:
         # Catch up
         # It the frame has more than one time interval of delay, it just skips the frame and directly
         # goes to the next one
-        # The condition on k is useful if one just want one frame and does not care about time sync
+        # The condition on current_frame_number is useful if one just wants one frame and does not care about time sync
         if self.delay >= self.parameters["time_interval"] and \
                 self.current_frame_number < (self.n_frames_total - 1):
             self.skip_frame = True
@@ -163,17 +201,21 @@ class Recorder:
         self.current_frame = self.current_frame + new_pic // self.parameters["average"]
         self.output_lock.release()
 
-    def capture_frame(self):
+    def async_frame_capture(self):
         output = npi.NPImage()
         self.output_lock = Lock()
 
+        print("#DEBUG enter async_frame_catupre")
+
+        # TODO repalce threads by processes
         threads = [None] * self.parameters["average"]
         for i, fname in enumerate(
                 self.camera.capture_continuous(output,
                                                'yuv', use_video_port=False, burst=False)):
 
             # Send the computation and saving of the new pic to separated thread
-            threads[i] = Thread(target=self.save_pic_to_frame, args=(output.get_data()))
+            # TODO : maybe shortcut that if avg == 1
+            threads[i] = Thread(target=self.save_pic_to_frame, args=(output.get_data(),))
             threads[i].start()
             # print(threads[i])
 
@@ -185,7 +227,94 @@ class Recorder:
         for t in threads:
             t.join()
 
+        print("#DEBUG leave async_frame_capture")
 
+    def save_frame(self):
+        """
+        Convert numpy array to image and save it locally
+        """
+        image = im.fromarray(self.current_frame)
+
+        save_path = self.get_last_save_path()
+        print(f"#DEBUG save path {save_path}")
+        image.save(save_path, quality=self.parameters["quality"])
+
+        self.write_extended_attributes(save_path=save_path)
+
+
+
+    def is_time_for_compression(self):
+        """
+        Check if it is time to compress (step number is reached or end of recording and return a bool
+        """
+        print("#DEBUG enter is_tme_for_compression")
+        try:
+            if self.current_frame_number % self.compress_step == self.compress_step - 1 or \
+                    (self.current_frame_number == self.n_frames_total - 1 and self.n_frames_total > 1):
+                return True
+            else:
+                return False
+        except TypeError as e:
+            print(e)
+        except ZeroDivisionError as e:
+            return False
+
+        print("#DEBUG leave is_tme_for_compression")
+
+
+    def start_async_compression_and_upload(self):
+        dir_to_compress = self.get_current_dir()
+        log("Dir_to_compress : %s" % dir_to_compress)
+        #log("Dest path : %s " % output_folder)
+        # compress_task = threading.Thread(target=compress, args=(dir_to_compress, output_folder))
+        self.compress_process = multiprocessing.Process(target=self.compress_and_upload, args=(dir_to_compress,))
+        self.compress_process.start()
+
+    def compress_and_upload(self,folder_name):
+        print(f"#DEBUG compressgin {folder_name}")
+        self.compress(folder_name=folder_name)
+        if self.parameters["use_samba"] is True:
+            print(f"#DEBUG uploading {folder_name}.tgz")
+            ok = self.smbupload(file_to_upload=f'{folder_name}.tgz')
+            if ok is True:
+                print(f"#DEBUG remove {folder_name}")
+                subprocess.run(['rm', '-rf', '%s' % folder_name])
+                print(f"#DEBUG remove {folder_name}.tgz")
+                subprocess.run(['rm', '-rf', '%s.tgz' % folder_name])
+            else:
+                # TODO handle that better
+                log("something went wrong wile uploading")
+                #raise Exception
+
+    def compress(self, folder_name):
+        pid = psutil.Process(os.getpid())
+
+        pid.nice(19)
+        log("Starting compression of %s" % folder_name)
+
+        call_args = ['tar', '--xattrs', '-czf', '%s.tgz' % folder_name, '-C', '%s' % folder_name, '.']
+        subprocess.run(call_args)
+
+        log("Compression of %s done" % folder_name,begin="\n")
+
+    def smbupload(self, file_to_upload):
+        command = f'put {file_to_upload}'
+
+
+        ok = subprocess.run(
+            ['smbclient',
+             f'{self.parameters["smb_service"]}',
+             '-W', f'{self.parameters["workgroup"]}',
+             '-A', f'{self.parameters["credentials_file"]}',
+             '-D', f'{self.parameters["smb_dir"]}',
+             '-c', f'{command}'],
+        capture_output=True)
+
+        return ok
+
+    def create_symlink_to_last_frame(self):
+        # TODO : check if really necessary and remove or adapt
+        subprocess.run(['ln', '-sf', '%s' % pathlib.Path(self.get_last_save_path()).absolute(), '/home/matthieu/tmp/last_frame.jpg'])
 
 ### Other utility functions
 
@@ -195,8 +324,92 @@ class Recorder:
         # Created directory to save locally the files before upload
         try:
             os.mkdir(self.parameters["local_tmp_dir"])
-            print("dir created")
+            print("#DEBUG dir created")
         except FileExistsError:
             pass
 
         os.chdir(self.parameters["local_tmp_dir"])
+
+    def compute_total_number_of_frames(self):
+        n_frames = 0
+        try:
+            n_frames = int(self.parameters["timeout"] / self.parameters["time_interval"])
+            if n_frames == 0:
+                n_frames = 1
+        except ZeroDivisionError:
+            n_frames = 1
+        finally:
+            return n_frames
+
+    def read_output_filename(self):
+        f = self.parameters["output_filename"]
+        if f == "auto":
+            return self.get_needed_output_format()
+        else:
+            return f
+
+    def get_needed_output_format(self):
+        digits = int(ceil(log10(self.n_frames_total)))
+        if digits == 0:
+            digits+=1
+        return f'%0{digits}d.jpg'
+
+    def get_local_save_dir(self):
+        try:
+            if self.parameters["use_samba"] is False:
+                # The local dir is the final output
+                path = self.parameters["local_output_dir"]
+            else:
+                # write frames in the tmp local dir, and wait for compression and upload
+                path = self.parameters["local_tmp_dir"]
+            return path
+        except TypeError:
+            return None
+
+    def create_output_folder(self):
+        pass
+        # try:
+        #     os.mkdir(self.get_local_save_dir())
+        #     print(f'#DEBUG {os.getcwd()}/{self.get_local_save_dir()} created')
+        # except FileExistsError:
+        #     print(f'#DEBUG {self.get_local_save_dir()} already exists')
+        #     pass
+
+    def get_last_save_path(self):
+        try:
+            print(f'#DEBUG get_local_save_dir {self.get_current_dir()}')
+            return os.path.join(self.get_current_dir(), self.get_filename())
+        except TypeError:
+            return None
+
+    def get_filename(self):
+        try:
+            # if automatic filename, i.e. filename is %0Xd.jpg
+            filename = self.output_filename % self.current_frame_number
+        except TypeError:
+            filename = self.output_filename
+        return filename
+
+    def write_extended_attributes(self, save_path):
+        os.setxattr(save_path, 'user.datetime', (str(datetime.now())).encode('utf-8'))
+        os.setxattr(save_path, 'user.index', ("%06d" % self.current_frame_number).encode('utf-8'))
+        os.setxattr(save_path, 'user.hostname', (os.uname()[1]).encode('utf-8'))
+        os.setxattr(save_path, 'user.jpg_quality', ("%02d" % self.parameters["quality"]).encode('utf-8'))
+        os.setxattr(save_path, 'user.averaged', ("%d" % self.parameters["average"]).encode('utf-8'))
+        os.setxattr(save_path, 'user.git_version', self.git_version.encode('utf-8'))
+        os.setxattr(save_path, 'user.skipped', ("%d" % int(self.skip_frame)).encode('utf-8'))
+
+    def get_current_dir(self):
+
+        if self.compress_step > 0:
+            part = self.current_frame_number // self.compress_step
+            current_dir = "part%02d" % part
+
+            try:
+                os.mkdir(current_dir)
+            except FileExistsError:
+                pass
+
+            return current_dir
+        else:
+            return "."

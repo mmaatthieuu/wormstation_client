@@ -31,5 +31,8 @@ class Camera(picamera.PiCamera):
         self.brightness = parameters["brightness"]
         #print(self.brightness)
 
+        log("Camera successfully started")
+
     def __del__(self):
+        log("Closing camera")
         self.close()

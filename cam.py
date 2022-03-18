@@ -81,283 +81,54 @@ git_check = subprocess.run(['git', '--git-dir=/home/matthieu/piworm/.git', 'rev-
                             '--all', '--abbrev-commit', '-n', '1'], text=True, capture_output=True)
 version = git_check.stdout
 
-#leds = tlc5940(blankpin=27,
-#               progpin=22,
-#               latchpin=17,
-#               gsclkpin=18,
-#               serialpin=23,
-#               clkpin=24)
 
-
-def init():
-
-    if args.vverbose:
-        args.verbose = True
-
-    if args.verbose:
-        print(print_args(args))
-
-    #leds.initialise()
-
-    if args.compress is not None:
-        try:
-            os.mkdir(local_tmp_dir)
-            log("Folder ", local_tmp_dir, " created")
-        except FileExistsError:
-            pass
-            # os.remove(".campy_local_save/*")
-        os.chdir(local_tmp_dir)
-
-def leds_on():
-    pass
-"""
-    while True:
-        for led in range(0, 16):
-            leds.set_grey(led, args.led_intensity)
-
-        leds.write_grey_values()
-        leds.pulse_clk()
-"""
-
-def save_info(args, version):
-
-    x = datetime.datetime.now()
-
-    #nfo_filename = "%s.nfo" % datetime.now()
-    nfo_filename = x.strftime("%Y%m%d_%H%M.nfo")
-    log(nfo_filename)
-    if args.output is not None:
-        nfo_path = pathlib.Path.joinpath(absolute_output_folder, nfo_filename)
-    else:
-        nfo_path = pathlib.Path("./%s" % nfo_filename)
-
-    with open(nfo_path, 'w') as f:
-        f.write("git commit : %s" % version)
-        f.write(print_args(args))
-
-    return nfo_path
-
-# Function to parallelize the computation of the new frame
-# save 0.2 to 0.3 seconds on capture time
-def save_pic_to_frame(new_pic, n, lock):
-    lock.acquire()
-    global current_frame
-    current_frame = current_frame + new_pic // n
-    lock.release()
-
-
-def record(args, camera):
-
-
-    global current_frame
-
-
-
-
-
-    nPicsPerFrames = args.average
-    try:
-        n_frames_total = int(args.timeout / args.time_interval)
-        if n_frames_total == 0:
-            n_frames_total = 1
-    except ZeroDivisionError:
-        n_frames_total = 1
-
-    number_of_skipped_frames = 0
-
-
-
-    # Main loop for recording
-    for k in range(args.start_frame, n_frames_total):
-
-        skip_frame = False
-        # (Re)Initialize the current frame
-        current_frame = np.empty((2464, 3296), dtype=np.uint8)
-
-        # Check if the current frame is on time
-        delay = time.time() - (initial_time + (k) * args.time_interval) + args.start_frame * args.time_interval
-
-        # If too early, wait until it is time to record
-        if delay < 0:
-            time.sleep(-delay)
-            if args.vverbose:
-                log("Waiting for %fs" % -delay)
-        elif delay < 0.01:     # We need some tolerance in this world...
-            pass
-        else:
-            if args.verbose:
-                #log('Frame %fs late' % -diff_time, begin="\n")
-                log('Delay : %fs' % delay)
-
-        # It the frame has more than one time interval of delay, it just skips the frame and directly
-        # goes to the next one
-        # The condition on k is useful if one just want one frame and does not care about time sync
-        if delay >= args.time_interval and k < (n_frames_total-1) :
-            skip_frame = True
-            log("Delay too long : Frame %d skipped" % (k), begin="\n    WARNING    ")
-
-        start_time = time.time()  # Starting time of the current frame
-        try:
-            if not skip_frame:
-
-                if args.vverbose:
-                    log("Starting capture of frame %d / %d" % (k + 1, n_frames_total))
-                elif args.verbose:
-                    print("\r[%s] : Starting capture of frame %d / %d" %
-                          (str(datetime.datetime.now()), k + 1, n_frames_total), end="")
-
-                output = npi.NPImage()
-                lock = Lock()
-
-                if args.annotate_frames:
-                    string_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                    string_to_overlay = "%s | %s" %(socket.gethostname(),string_time)
-
-                    camera.annotate_text = string_to_overlay
-
-                threads = [None]*nPicsPerFrames
-                for i, fname in enumerate(camera.capture_continuous(output, 'yuv', use_video_port=False, burst=False)):
-
-                    # Send the computation and saving of the new pic to separated thread
-                    threads[i] = Thread(target=save_pic_to_frame, args=(output.get_data(), nPicsPerFrames, lock))
-                    threads[i].start()
-                    #print(threads[i])
-
-                    # Frame has been taken so we can reinitialize the number of skipped frames
-                    number_of_skipped_frames = 0
-
-                    if i == nPicsPerFrames-1:
-                        break
-                for t in threads:
-                    t.join()
-                    #print(t)
-                # print(np.max(pictures_to_average))
-
-            # That is some weird error that occurs randomly...
-        except picamera.exc.PiCameraRuntimeError as error:
-            log("Error 1 on frame %d" % k)
-            log("Timeout Error : Frame %d skipped" % (k), begin="\n    WARNING    ")
-            log(error)
-            skip_frame = True
-            if number_of_skipped_frames == 0:
-                number_of_skipped_frames+=1
-                continue
-            else:
-                log("Warning : Camera seems stuck... Trying to restart it")
-                raise CrashTimeOutException(k)
-            # sys.exit()
-        except RuntimeError:
-            log("Error 2 on frame %d" % k)
-
-        finally:
-            if args.output is not None:
-                save_image(current_frame, k, absolute_output_folder,
-                           output_filename, args.compress, n_frames_total, args.quality, args.average, version,
-                           skip_frame)
-
-        execTime = (time.time() - start_time)
-        if args.vverbose:
-            log("Finished capture of frame %d in %fs" % (k + 1, execTime))
-
-
+def get_git_version():
+    # TODO make that git check better
+    folder_path = os.path.dirname(os.path.realpath(__file__))
+    git_check = subprocess.run(['git', f'--git-dir={folder_path}/.git', 'rev-list',
+                                '--all', '--abbrev-commit', '-n', '1'], text=True, capture_output=True)
+    version = git_check.stdout
+    return version
 
 
 def main():
-    print(os.getcwd())
+    # TODO : take json config as input
     parameters = Parameters("./piworm/config.json")
 
-    recorder = Recorder(parameters=parameters)
+    recorder = Recorder(parameters=parameters, git_version=get_git_version())
 
-    print("end")
-    quit()
-    init()
+    print("recorder created")
 
-    #led_proc = Process(target=leds_on, args=(), daemon=True)
-    #led_proc.start()
-
-    if args.save_nfo:
-        nfo_path = save_info(args, version)
+    # TODO : save json config
 
     picamera.PiCamera.CAPTURE_TIMEOUT = 3
 
     try:
 
-        subprocess.run(['cpulimit', '-P', '/usr/bin/gzip', '-l', '10', '-b', '-q'])
 
-        camera = cam_init(iso=args.iso, shutter_speed=args.shutter_speed, brightness=args.brightness,
-                 verbose=args.verbose)
+        print("Start recording")
+        recorder.start_recording()
+        print("end")
 
-
-
-
-        if args.preview:
-            camera.start_preview()
-
-
-        #time.sleep(2)  # let the camera warm up and set gain/white balance
-
-        gain_str = "A/D gains: {}, {}".format(camera.analog_gain, camera.digital_gain)
-
-        if args.save_nfo:
-            with open(nfo_path,'a') as file:
-                file.write(gain_str + '\n')
-
-        if args.verbose:
-            log("Camera successfully started")
-            log(gain_str)
-
-        global initial_time
-        initial_time = time.time()
-
-        record(args=args, camera=camera)
-        print("shutter speed : %d" % camera.exposure_speed)
 
     except KeyboardInterrupt:
         log("\nScript interrupted by user")
 
-        subprocess.run(['pkill', 'cpulimit'])
+        del recorder
 
-
-        if args.verbose:
-            log("Closing camera...")
-        camera.close()
-
-        if args.verbose:
+        if parameters["verbosity_level"]>0:
             log("Over.")
 
     # else:
     #     log("\nOops... Something went wrong.\n")
     except CrashTimeOutException as e:
-
-        camera.close()
-        log("Camera closed")
-        camera = cam_init(iso=args.iso, shutter_speed=args.shutter_speed, brightness=args.brightness,
-                 verbose=args.verbose)
-        log("Camera up again")
-        args.start_frame = int(e.frame_number)
-
-        log("Restart record at frame %d" % args.start_frame)
-        record(args=args, camera=camera)
-        #picamera.PiCamera.CAPTURE_TIMEOUT = 10
+        print("#DEBUG Crash time out exception")
 
     else:
 
-        subprocess.run(['pkill', 'cpulimit'])
+        del recorder
 
-        #led_proc.kill()
-        #time.sleep(0.1)
-        #leds.blank(1)
-        #leds.cleanup()
-
-        #led_p.kill()
-
-        print('thread killed')
-
-        if args.verbose:
-            log("Closing camera...")
-        camera.close()
-
-        if args.verbose:
+        if parameters["verbosity_level"]>0:
             log("Over.")
 
 if __name__ == "__main__":

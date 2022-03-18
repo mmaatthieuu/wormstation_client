@@ -1,24 +1,25 @@
 {
-  "verbosity_level" :	1,
+  "verbosity_level" :	2,
   "timeout" : 			0,
-  "time_interval" : 	2.5,
-  "average" : 			4,
+  "time_interval" : 	2,
+  "average" : 			1,
   "quality" : 			90,
   "ISO" :				0,
   "shutter_speed" :		0,
   "brightness" :		50,
-  "compress" : 			2000,
+  "compress" : 			0,
   "start_frame" :		0,
   "LED_intensity" :     1,
   "annotate_frames" :   true,
   
   "use_samba" :			true,
   "smb_service" :		"//lpbsnas1.epfl.ch/LPBS",
-  "workgroup" :			"INTRANET",
-  "credentials_file" :	"/etc/.smbcreds",
-  "smb_dir" : 			"Users/Matthieu-Schmidt/WORMSTATION",
+  "workgroup" :			"",
+  "credentials_file" :	"/etc/.smbpicreds",
+  "smb_dir" : 			"Users/Matthieu-Schmidt/WORMSTATION/20220318/piworm09.epfl.ch",
+  "local_output_dir" :  "none",
   
-  "local_output" :		"none",
+  "output_filename" :	"auto",
   "local_tmp_dir" :     ".wormstation_tmp",
   
   "capture_timeout" :	3.0
