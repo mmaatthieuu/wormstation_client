@@ -59,6 +59,9 @@ class Recorder:
 
         self.git_version = git_version
 
+        if self.parameters["use_samba"]:
+            self.smb_output = self.create_smb_tree_structure()
+
         print(self.git_version)
 
         #self.output = None
@@ -191,7 +194,7 @@ class Recorder:
 
     def annotate_frame(self):
         if self.parameters["annotate_frames"]:
-            string_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            string_time = (datetime.now()).strftime('%Y-%m-%d %H:%M:%S')
             string_to_overlay = "%s | %s" % (gethostname(), string_time)
 
             self.camera.annotate_text = string_to_overlay
@@ -299,21 +302,35 @@ class Recorder:
 
     def smbupload(self, file_to_upload):
         command = f'put {file_to_upload}'
+        ok = self.smbcommand(command)
 
+        return ok
 
+    def create_smb_tree_structure(self):
+        folder1 = (datetime.now()).strftime("%Y%m%d")
+        folder2 = gethostname()
+        self.smbcommand(command=f'mkdir {folder1}', working_dir=self.parameters["smb_dir"])
+        self.smbcommand(command=f'mkdir {folder1}/{folder2}', working_dir=self.parameters["smb_dir"])
+
+        return f'{self.parameters["smb_dir"]}/{folder1}/{folder2}'
+
+    def smbcommand(self, command, working_dir=None):
+        if working_dir is None:
+            working_dir = self.smb_output
         ok = subprocess.run(
             ['smbclient',
              f'{self.parameters["smb_service"]}',
              '-W', f'{self.parameters["workgroup"]}',
              '-A', f'{self.parameters["credentials_file"]}',
-             '-D', f'{self.parameters["smb_dir"]}',
+             '-D', f'{working_dir}',
              '-c', f'{command}'],
-        capture_output=True)
+            capture_output=True)
 
         return ok
 
     def create_symlink_to_last_frame(self):
         # TODO : check if really necessary and remove or adapt
+        print(pathlib.Path(self.get_last_save_path()).absolute())
         subprocess.run(['ln', '-sf', '%s' % pathlib.Path(self.get_last_save_path()).absolute(), '/home/matthieu/tmp/last_frame.jpg'])
 
 ### Other utility functions
