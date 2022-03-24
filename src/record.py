@@ -6,6 +6,7 @@ from PIL import Image as im
 
 
 import picamera
+import json
 
 from math import log10, ceil
 
@@ -21,12 +22,11 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from src.utils import log
+#from src.utils import log
 
 import src.NPImage as npi
 from src.CrashTimeOutException import CrashTimeOutException
-
-
+from src.log import Logger
 
 class Recorder:
     """
@@ -41,6 +41,8 @@ class Recorder:
 
         # Create the camera object with the input parameters
         self.camera = Camera(parameters=self.parameters)
+
+        self.logger = Logger(verbosity_level=parameters["verbosity_level"], save_log=self.is_it_useful_to_save_logs())
 
         self.current_frame = None
         self.current_frame_number = 0
@@ -62,7 +64,7 @@ class Recorder:
         if self.parameters["use_samba"]:
             self.smb_output = self.create_smb_tree_structure()
 
-        print(self.git_version)
+        #print(self.git_version)
 
         #self.output = None
         self.output_lock = Lock()
@@ -73,7 +75,7 @@ class Recorder:
         self.compress_process = None
 
     def __del__(self):
-        log("Closing recorder")
+        self.logger.log("Closing recorder")
         subprocess.run(['pkill', 'cpulimit'])
         del self.camera
 
@@ -87,11 +89,11 @@ class Recorder:
         # TODO : check if samba config is working
 
         # Go to home directory
-        print("#DEBUG go to rec folder")
         self.go_to_tmp_recording_folder()
 
         # Compute the total number of frame from the recording time and time interval between frames
 
+        self.logger.log(json.dumps(self.parameters, indent=4))
 
         self.initial_time = time.time()
 
@@ -118,37 +120,38 @@ class Recorder:
                     self.async_frame_capture()
 
             except picamera.exc.PiCameraRuntimeError as error:
-                log("Error 1 on frame %d" % self.current_frame_number)
-                log("Timeout Error : Frame %d skipped" % self.current_frame_number, begin="\n    WARNING    ", end="\n")
-                log(error)
+                self.logger.log("Error 1 on frame %d" % self.current_frame_number)
+                self.logger.log("Timeout Error : Frame %d skipped" % self.current_frame_number, begin="\n    WARNING    ", end="\n")
+                self.logger.log(error)
                 self.skip_frame = True
                 if self.number_of_skipped_frames == 0:
                     self.number_of_skipped_frames += 1
                     continue
                 # Already one frame has been skipped -> camera probably stuck
                 else:
-                    log("Warning : Camera seems stuck... Trying to restart it")
+                    self.logger.log("Warning : Camera seems stuck... Trying to restart it")
                     del self.camera
                     self.camera = Camera(parameters=self.parameters)
                     #raise CrashTimeOutException(self.current_frame_number)
                 # sys.exit()
             except RuntimeError:
                 # Never occurs actually
-                log("Error 2 on frame %d" % self.current_frame_number)
+                self.logger.log("Error 2 on frame %d" % self.current_frame_number)
 
             finally:
+                #TODO : write doc about why this check is useful
                 if self.get_last_save_path() is not None:
                     # TODO : other thread for saving
                     self.save_frame()
 
                     if self.is_time_for_compression():
-                        print("#DEBUG compress now")
                         self.start_async_compression_and_upload()
 
+                    if self.parameters["use_samba"]:
+                        self.smbupload(file_to_upload=self.logger.get_log_file_path(),
+                                       filename_at_destination=self.logger.get_log_filename())
                 #create link to last frame
                 self.create_symlink_to_last_frame()
-        print("#DEBUG recording done")
-
 
 
 
@@ -163,14 +166,14 @@ class Recorder:
         if self.delay < 0:
             time.sleep(-self.delay)
             if self.parameters["verbosity_level"] >= 2:
-                log("Waiting for %fs" % -self.delay)
+                self.logger.log("Waiting for %fs" % -self.delay)
         elif self.delay < 0.01:  # We need some tolerance in this world...
             pass # And go on directly with frame capture
         else:
             # Frame late : log delay
             if self.parameters["verbosity_level"] >= 1:
                 # log('Frame %fs late' % -diff_time, begin="\n")
-                log('Delay : %fs' % self.delay)
+                self.logger.log('Delay : %fs' % self.delay)
 
         # Catch up
         # It the frame has more than one time interval of delay, it just skips the frame and directly
@@ -179,17 +182,16 @@ class Recorder:
         if self.delay >= self.parameters["time_interval"] and \
                 self.current_frame_number < (self.n_frames_total - 1):
             self.skip_frame = True
-            log(f"Delay too long : Frame {self.current_frame_number} skipped", begin="\n    WARNING    ")
+            self.logger.log(f"Delay too long : Frame {self.current_frame_number} skipped", begin="\n    WARNING    ")
 
     def log_progress(self):
         if self.parameters["verbosity_level"] >= 2:
-            log(f"Starting capture of frame {self.current_frame_number + 1}"
-                f" / {self.n_frames_total}")
+            self.logger.log(f"Starting capture of frame {self.current_frame_number + 1}"
+                            f" / {self.n_frames_total}")
         elif self.parameters["verbosity_level"] == 1:
-            # print("\r[%s] : Starting capture of frame %d / %d" %
-            #      (str(datetime.datetime.now()), k + 1, n_frames_total), end="")
-            log(f"Starting capture of frame {self.current_frame_number + 1} "
-                f"/ {self.n_frames_total}", begin="\r", end="")
+
+            self.logger.log(f"Starting capture of frame {self.current_frame_number + 1} "
+                            f"/ {self.n_frames_total}", begin="\r", end="")
 
 
     def annotate_frame(self):
@@ -207,8 +209,6 @@ class Recorder:
     def async_frame_capture(self):
         output = npi.NPImage()
         self.output_lock = Lock()
-
-        print("#DEBUG enter async_frame_catupre")
 
         # TODO repalce threads by processes
         threads = [None] * self.parameters["average"]
@@ -230,8 +230,6 @@ class Recorder:
         for t in threads:
             t.join()
 
-        print("#DEBUG leave async_frame_capture")
-
     def save_frame(self):
         """
         Convert numpy array to image and save it locally
@@ -239,7 +237,6 @@ class Recorder:
         image = im.fromarray(self.current_frame)
 
         save_path = self.get_last_save_path()
-        print(f"#DEBUG save path {save_path}")
         image.save(save_path, quality=self.parameters["quality"])
 
         self.write_extended_attributes(save_path=save_path)
@@ -250,7 +247,6 @@ class Recorder:
         """
         Check if it is time to compress (step number is reached or end of recording and return a bool
         """
-        print("#DEBUG enter is_tme_for_compression")
         try:
             if self.current_frame_number % self.compress_step == self.compress_step - 1 or \
                     (self.current_frame_number == self.n_frames_total - 1 and self.n_frames_total > 1):
@@ -262,49 +258,46 @@ class Recorder:
         except ZeroDivisionError as e:
             return False
 
-        print("#DEBUG leave is_tme_for_compression")
-
 
     def start_async_compression_and_upload(self):
         dir_to_compress = self.get_current_dir()
-        log("Dir_to_compress : %s" % dir_to_compress)
+        self.logger.log("Dir_to_compress : %s" % dir_to_compress)
         #log("Dest path : %s " % output_folder)
         # compress_task = threading.Thread(target=compress, args=(dir_to_compress, output_folder))
         self.compress_process = multiprocessing.Process(target=self.compress_and_upload, args=(dir_to_compress,))
         self.compress_process.start()
 
     def compress_and_upload(self,folder_name):
-        print(f"#DEBUG compressgin {folder_name}")
         self.compress(folder_name=folder_name)
         if self.parameters["use_samba"] is True:
             print(f"#DEBUG uploading {folder_name}.tgz")
             ok = self.smbupload(file_to_upload=f'{folder_name}.tgz')
-            if ok is True:
-                print(f"#DEBUG remove {folder_name}")
-                subprocess.run(['rm', '-rf', '%s' % folder_name])
-                print(f"#DEBUG remove {folder_name}.tgz")
-                subprocess.run(['rm', '-rf', '%s.tgz' % folder_name])
-            else:
+            #if ok is True:
+            subprocess.run(['rm', '-rf', '%s' % folder_name])
+            subprocess.run(['rm', '-rf', '%s.tgz' % folder_name])
+            #else:
                 # TODO handle that better
-                log("something went wrong wile uploading")
+                #log("something went wrong wile uploading")
                 #raise Exception
 
     def compress(self, folder_name):
         pid = psutil.Process(os.getpid())
 
         pid.nice(19)
-        log("Starting compression of %s" % folder_name)
+        self.logger.log("Starting compression of %s" % folder_name)
 
         call_args = ['tar', '--xattrs', '-czf', '%s.tgz' % folder_name, '-C', '%s' % folder_name, '.']
         subprocess.run(call_args)
 
-        log("Compression of %s done" % folder_name,begin="\n")
+        self.logger.log("Compression of %s done" % folder_name,begin="\n")
 
-    def smbupload(self, file_to_upload):
-        command = f'put {file_to_upload}'
-        ok = self.smbcommand(command)
+    def smbupload(self, file_to_upload, filename_at_destination=""):
+        if file_to_upload is not None:
+            command = f'put {file_to_upload} {filename_at_destination}'
+            ok = self.smbcommand(command)
 
-        return ok
+            return ok
+        return True
 
     def create_smb_tree_structure(self):
         folder1 = (datetime.now()).strftime("%Y%m%d")
@@ -317,6 +310,7 @@ class Recorder:
     def smbcommand(self, command, working_dir=None):
         if working_dir is None:
             working_dir = self.smb_output
+
         ok = subprocess.run(
             ['smbclient',
              f'{self.parameters["smb_service"]}',
@@ -330,7 +324,6 @@ class Recorder:
 
     def create_symlink_to_last_frame(self):
         # TODO : check if really necessary and remove or adapt
-        print(pathlib.Path(self.get_last_save_path()).absolute())
         subprocess.run(['ln', '-sf', '%s' % pathlib.Path(self.get_last_save_path()).absolute(), '/home/matthieu/tmp/last_frame.jpg'])
 
 ### Other utility functions
@@ -341,7 +334,6 @@ class Recorder:
         # Created directory to save locally the files before upload
         try:
             os.mkdir(self.parameters["local_tmp_dir"])
-            print("#DEBUG dir created")
         except FileExistsError:
             pass
 
@@ -394,7 +386,6 @@ class Recorder:
 
     def get_last_save_path(self):
         try:
-            print(f'#DEBUG get_local_save_dir {self.get_current_dir()}')
             return os.path.join(self.get_current_dir(), self.get_filename())
         except TypeError:
             return None
@@ -430,3 +421,8 @@ class Recorder:
             return current_dir
         else:
             return "."
+
+    def is_it_useful_to_save_logs(self):
+        if self.parameters["timeout"] == 0:
+            return False
+        return True

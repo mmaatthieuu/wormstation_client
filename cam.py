@@ -106,12 +106,9 @@ def parse_input():
 
 def main():
     # TODO : take json config as input
-    print("yo")
     parameters = Parameters(sys.argv[1])
 
     recorder = Recorder(parameters=parameters, git_version=get_git_version())
-
-    print("recorder created")
 
     # TODO : save json config
 
@@ -120,18 +117,19 @@ def main():
     try:
 
 
-        print("Start recording")
+        #print("Start recording")
         recorder.start_recording()
-        print("end")
+        #print("end")
 
 
     except KeyboardInterrupt:
-        log("\nScript interrupted by user")
+        #log("\nScript interrupted by user")
 
         del recorder
 
         if parameters["verbosity_level"]>0:
-            log("Over.")
+            pass
+            #log("Over.")
 
     # else:
     #     log("\nOops... Something went wrong.\n")
@@ -143,7 +141,8 @@ def main():
         del recorder
 
         if parameters["verbosity_level"]>0:
-            log("Over.")
+            pass
+            #log("Over.")
 
 if __name__ == "__main__":
     main()
