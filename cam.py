@@ -1,27 +1,15 @@
 #!/usr/bin/python3 -u
-import pathlib
-import sys
 
-import numpy as np
-import time
 import picamera
 import argparse
 import os.path
-import subprocess
-import socket
-from multiprocessing.pool import ThreadPool
-from multiprocessing import Process
-from threading import Thread,Lock
-from queue import Queue
+
+
+import cProfile
+import pstats
 
 from parameters import Parameters
-import sys
-import json
 
-import src.NPImage as npi
-from src.tlc5940.tlc import tlc5940
-
-import datetime
 
 from src.cam_lib import *
 from src.record import Recorder
@@ -114,11 +102,17 @@ def main():
 
     picamera.PiCamera.CAPTURE_TIMEOUT = 3
 
+    #profile = cProfile.Profile()
+
     try:
 
 
         #print("Start recording")
+        #profile.runcall(recorder.start_recording,)
         recorder.start_recording()
+        #ps = pstats.Stats(profile)
+        #ps.sort_stats('time')
+        #ps.print_stats(10)
         #print("end")
 
 

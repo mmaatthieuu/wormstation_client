@@ -14,7 +14,8 @@ class Logger:
             print(string, end=end)
         else:
             with open(self.path, 'a') as log_file:
-                log_file.write(string)
+                print(string, end=end, file=log_file)
+                #log_file.write(string)
 
     def init_path(self, save_log):
         if save_log:

@@ -10,7 +10,7 @@ import json
 
 from math import log10, ceil
 
-from threading import Thread,Lock
+from threading import Thread, Lock
 import multiprocessing
 
 import psutil
@@ -20,12 +20,9 @@ from src.camera import Camera
 from src.tlc5940.tlc import tlc5940
 import os
 import subprocess
-import sys
 from pathlib import Path
-#from src.utils import log
 
 import src.NPImage as npi
-from src.CrashTimeOutException import CrashTimeOutException
 from src.log import Logger
 
 class Recorder:
@@ -67,12 +64,15 @@ class Recorder:
         #print(self.git_version)
 
         #self.output = None
-        self.output_lock = Lock()
+        self.output_lock = None
+        if self.parameters["average"] != 1:
+            self.output_lock = Lock()
 
         subprocess.run(['cpulimit', '-P', '/usr/bin/gzip', '-l', '10', '-b', '-q'])
 
         # TODO pool instead of single process
         self.compress_process = None
+        self.save_process = None
 
     def __del__(self):
         self.logger.log("Closing recorder")
@@ -141,15 +141,20 @@ class Recorder:
             finally:
                 #TODO : write doc about why this check is useful
                 if self.get_last_save_path() is not None:
-                    # TODO : other thread for saving
-                    self.save_frame()
+                    # new process for saving
+                    self.save_process = multiprocessing.Process(target=self.save_frame)
+                    self.save_process.start()
+                    #self.save_frame()
 
                     if self.is_time_for_compression():
+                        self.logger.log("time for compression")
                         self.start_async_compression_and_upload()
 
                     if self.parameters["use_samba"]:
-                        self.smbupload(file_to_upload=self.logger.get_log_file_path(),
-                                       filename_at_destination=self.logger.get_log_filename())
+                        self.async_smbupload(file_to_upload=self.logger.get_log_file_path(),
+                                             filename_at_destination=self.logger.get_log_filename())
+                        self.async_smbupload(file_to_upload=self.logger.get_log_file_path(),
+                                             filename_at_destination=self.logger.get_log_filename())
                 #create link to last frame
                 self.create_symlink_to_last_frame()
 
@@ -202,33 +207,38 @@ class Recorder:
             self.camera.annotate_text = string_to_overlay
 
     def save_pic_to_frame(self, new_pic):
-        self.output_lock.acquire()
+        #self.output_lock.acquire()
         self.current_frame = self.current_frame + new_pic // self.parameters["average"]
-        self.output_lock.release()
+        #self.output_lock.release()
 
     def async_frame_capture(self):
         output = npi.NPImage()
-        self.output_lock = Lock()
+        if self.parameters["average"] == 1:
+            self.camera.capture(output, 'yuv', use_video_port=False)
+            self.current_frame = output.get_data()
+        else:
+            #self.output_lock = Lock()
 
-        # TODO repalce threads by processes
-        threads = [None] * self.parameters["average"]
-        for i, fname in enumerate(
-                self.camera.capture_continuous(output,
-                                               'yuv', use_video_port=False, burst=False)):
+            # TODO repalce threads by processes
+            threads = [None] * self.parameters["average"]
+            for i, fname in enumerate(
+                    self.camera.capture_continuous(output,
+                                                   'yuv', use_video_port=False, burst=False)):
 
-            # Send the computation and saving of the new pic to separated thread
-            # TODO : maybe shortcut that if avg == 1
-            threads[i] = Thread(target=self.save_pic_to_frame, args=(output.get_data(),))
-            threads[i].start()
-            # print(threads[i])
+                # Send the computation and saving of the new pic to separated thread
+                # TODO : maybe shortcut that if avg == 1
+                threads[i] = Thread(target=self.save_pic_to_frame, args=(output.get_data(),))
+                print(f"start {i} {fname}")
+                threads[i].start()
+                print(threads[i])
 
-            # Frame has been taken so we can reinitialize the number of skipped frames
-            self.number_of_skipped_frames = 0
+                # Frame has been taken so we can reinitialize the number of skipped frames
+                self.number_of_skipped_frames = 0
 
-            if i == self.parameters["average"] - 1:
-                break
-        for t in threads:
-            t.join()
+                if i == self.parameters["average"] - 1:
+                    break
+            for t in threads:
+                t.join()
 
     def save_frame(self):
         """
@@ -263,7 +273,7 @@ class Recorder:
         dir_to_compress = self.get_current_dir()
         self.logger.log("Dir_to_compress : %s" % dir_to_compress)
         #log("Dest path : %s " % output_folder)
-        # compress_task = threading.Thread(target=compress, args=(dir_to_compress, output_folder))
+        self.save_process.join()
         self.compress_process = multiprocessing.Process(target=self.compress_and_upload, args=(dir_to_compress,))
         self.compress_process.start()
 
@@ -290,6 +300,11 @@ class Recorder:
         subprocess.run(call_args)
 
         self.logger.log("Compression of %s done" % folder_name,begin="\n")
+
+    def async_smbupload(self, file_to_upload, filename_at_destination=""):
+        upload_proc = multiprocessing.Process(target=self.smbupload,
+                                                  args=(file_to_upload, filename_at_destination))
+        upload_proc.start()
 
     def smbupload(self, file_to_upload, filename_at_destination=""):
         if file_to_upload is not None:
