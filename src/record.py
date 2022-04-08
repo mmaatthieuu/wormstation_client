@@ -118,6 +118,7 @@ class Recorder:
                     self.annotate_frame()
 
                     self.async_frame_capture()
+                    time.sleep(0.5)
 
             except picamera.exc.PiCameraRuntimeError as error:
                 self.logger.log("Error 1 on frame %d" % self.current_frame_number)
