@@ -7,7 +7,16 @@ from parameters import Parameters
 
 class Camera(picamera.PiCamera):
     def __init__(self, parameters):
-        super(Camera, self).__init__(resolution='3296x2464', framerate=1000000 / parameters["shutter_speed"])
+
+        try:
+            framerate = 1000000 / parameters["shutter_speed"]
+        except ZeroDivisionError:
+            framerate = 20
+
+        if framerate > 20:
+            framerate = 20
+
+        super(Camera, self).__init__(resolution='3296x2464', framerate=framerate)
 
         self.iso = parameters["ISO"]
         #self.framerate = 1000000 / (parameters["shutter_speed"])
