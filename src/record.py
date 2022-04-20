@@ -36,6 +36,12 @@ class Recorder:
         # Get parameter as argument or create new instance that load json ??
         self.parameters = parameters
 
+        # Remark : the directory is created on the NAS before initializing the camera
+        # If the camera is initialized first, it produces only black frames...
+        # It is weird, but at least it works like that
+        if self.parameters["use_samba"]:
+            self.smb_output = self.create_smb_tree_structure()
+
         # Create the camera object with the input parameters
         self.camera = Camera(parameters=self.parameters)
 
@@ -58,8 +64,7 @@ class Recorder:
 
         self.git_version = git_version
 
-        if self.parameters["use_samba"]:
-            self.smb_output = self.create_smb_tree_structure()
+
 
         #print(self.git_version)
 
@@ -316,7 +321,7 @@ class Recorder:
         return True
 
     def create_smb_tree_structure(self):
-        folder1 = (datetime.now()).strftime("%Y%m%d")
+        folder1 = (datetime.now()).strftime("%Y%m%d_%H%M")
         folder2 = gethostname()
         self.smbcommand(command=f'mkdir {folder1}', working_dir=self.parameters["smb_dir"])
         self.smbcommand(command=f'mkdir {folder1}/{folder2}', working_dir=self.parameters["smb_dir"])
@@ -327,15 +332,18 @@ class Recorder:
         if working_dir is None:
             working_dir = self.smb_output
 
-        ok = subprocess.run(
-            ['smbclient',
-             f'{self.parameters["smb_service"]}',
-             '-W', f'{self.parameters["workgroup"]}',
-             '-A', f'{self.parameters["credentials_file"]}',
-             '-D', f'{working_dir}',
-             '-c', f'{command}'],
-            capture_output=True)
-
+        ok = False
+        try:
+            ok = subprocess.run(
+                ['smbclient',
+                 f'{self.parameters["smb_service"]}',
+                 '-W', f'{self.parameters["workgroup"]}',
+                 '-A', f'{self.parameters["credentials_file"]}',
+                 '-D', f'{working_dir}',
+                 '-c', f'{command}'],
+                capture_output=True)
+        except Exception as e:
+            print(e)
         return ok
 
     def create_symlink_to_last_frame(self):
@@ -379,26 +387,28 @@ class Recorder:
             digits+=1
         return f'%0{digits}d.jpg'
 
-    def get_local_save_dir(self):
-        try:
-            if self.parameters["use_samba"] is False:
-                # The local dir is the final output
-                path = self.parameters["local_output_dir"]
-            else:
-                # write frames in the tmp local dir, and wait for compression and upload
-                path = self.parameters["local_tmp_dir"]
-            return path
-        except TypeError:
-            return None
+    # def get_local_save_dir(self):
+    #     try:
+    #         if self.parameters["use_samba"] is False:
+    #             # The local dir is the final output
+    #             path = self.parameters["local_output_dir"]
+    #         else:
+    #             # write frames in the tmp local dir, and wait for compression and upload
+    #             path = self.parameters["local_tmp_dir"]
+    #         #return path
+    #         return self.parameters["local_tmp_dir"]
+    #     except TypeError:
+    #         return None
+    #
+    # def create_output_folder(self):
+    #     pass
+    #     # try:
+    #     #     os.mkdir(self.get_local_save_dir())
+    #     #     print(f'#DEBUG {os.getcwd()}/{self.get_local_save_dir()} created')
+    #     # except FileExistsError:
+    #     #     print(f'#DEBUG {self.get_local_save_dir()} already exists')
+    #     #     pass
 
-    def create_output_folder(self):
-        pass
-        # try:
-        #     os.mkdir(self.get_local_save_dir())
-        #     print(f'#DEBUG {os.getcwd()}/{self.get_local_save_dir()} created')
-        # except FileExistsError:
-        #     print(f'#DEBUG {self.get_local_save_dir()} already exists')
-        #     pass
 
     def get_last_save_path(self):
         try:
