@@ -208,7 +208,7 @@ class Recorder:
     def annotate_frame(self):
         if self.parameters["annotate_frames"]:
             string_time = (datetime.now()).strftime('%Y-%m-%d %H:%M:%S')
-            string_to_overlay = "%s | %s" % (gethostname(), string_time)
+            string_to_overlay = "%s | %s | %s" % (gethostname(), self.get_filename(), string_time)
 
             self.camera.annotate_text = string_to_overlay
 
