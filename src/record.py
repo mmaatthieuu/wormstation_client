@@ -290,7 +290,7 @@ class Recorder:
             ok = self.smbupload(file_to_upload=f'{folder_name}.tgz')
             #if ok is True:
             subprocess.run(['rm', '-rf', '%s' % folder_name])
-            subprocess.run(['rm', '-rf', '%s.tgz' % folder_name])
+            #subprocess.run(['rm', '-rf', '%s.tgz' % folder_name])
             #else:
                 # TODO handle that better
                 #log("something went wrong wile uploading")
