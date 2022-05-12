@@ -286,8 +286,11 @@ class Recorder:
     def compress_and_upload(self,folder_name):
         self.compress(folder_name=folder_name)
         if self.parameters["use_samba"] is True:
-            print(f"#DEBUG uploading {folder_name}.tgz")
-            ok = self.smbupload(file_to_upload=f'{folder_name}.tgz')
+            file_to_upload = f'{folder_name}.tgz'
+            #print(f"#DEBUG uploading {file_to_upload}")
+            while self.upload_failed(file_to_upload):
+                ok = self.smbupload(file_to_upload=file_to_upload)
+
             #if ok is True:
             subprocess.run(['rm', '-rf', '%s' % folder_name])
             #subprocess.run(['rm', '-rf', '%s.tgz' % folder_name])
@@ -295,6 +298,11 @@ class Recorder:
                 # TODO handle that better
                 #log("something went wrong wile uploading")
                 #raise Exception
+
+    def upload_failed(self, uploaded_file):
+        out_str = self.smbcommand("ls").stdout.decode("utf-8")
+        return uploaded_file not in out_str
+
 
     def compress(self, folder_name):
         pid = psutil.Process(os.getpid())
