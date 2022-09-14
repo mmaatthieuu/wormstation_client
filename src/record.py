@@ -369,7 +369,10 @@ class Recorder:
         return True
 
     def create_smb_tree_structure(self):
-        folder1 = f'{(datetime.now()).strftime("%Y%m%d_%H%M")}{self.parameters["recording_name"]}'
+        try:
+            folder1 = f'{(datetime.now()).strftime("%Y%m%d_%H%M")}{self.parameters["recording_name"]}'
+        except:
+            folder1 = (datetime.now()).strftime("%Y%m%d_%H%M")
         folder2 = gethostname()
         self.smbcommand(command=f'mkdir {folder1}', working_dir=self.parameters["smb_dir"])
         self.smbcommand(command=f'mkdir {folder1}/{folder2}', working_dir=self.parameters["smb_dir"])
