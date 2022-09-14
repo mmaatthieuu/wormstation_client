@@ -1,10 +1,11 @@
 #!/usr/bin/python3 -u
 
-import picamera
+#import picamera
 import argparse
 import os.path
 
-
+import subprocess
+import sys
 import cProfile
 import pstats
 
@@ -100,7 +101,7 @@ def main():
 
     # TODO : save json config
 
-    picamera.PiCamera.CAPTURE_TIMEOUT = 3
+    #picamera.PiCamera.CAPTURE_TIMEOUT = 3
 
     #profile = cProfile.Profile()
 

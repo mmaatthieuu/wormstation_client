@@ -1,21 +1,21 @@
-import pathlib
-import time
+# import pathlib
+# import time
 import datetime
-import numpy as np
-from PIL import Image as im
+# import numpy as np
+# from PIL import Image as im
 # import threading
-import multiprocessing
-import subprocess
+# import multiprocessing
+# import subprocess
+#
+# import psutil
+# import sys
+# import shutil
+# import tarfile
+# import os
+# import picamera
 
-import psutil
-import sys
-import shutil
-import tarfile
-import os
-import picamera
 
-
-from .set_picamera_gain import set_analog_gain, set_digital_gain
+# from .set_picamera_gain import set_analog_gain, set_digital_gain
 
 
 

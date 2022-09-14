@@ -5,8 +5,10 @@ from socket import gethostname
 from PIL import Image as im
 
 
-import picamera
+# import picamera
 import json
+from picamera2 import MappedArray
+import cv2
 
 from math import log10, ceil
 
@@ -100,17 +102,20 @@ class Recorder:
 
         self.logger.log(json.dumps(self.parameters, indent=4))
 
+        self.camera.pre_callback = self.annotate_frame
+
+        self.camera.start()
+
         self.initial_time = time.time()
 
         #self.create_output_folder()
-
 
         # Main recording loop
         for self.current_frame_number in range(self.parameters["start_frame"], self.n_frames_total):
             self.skip_frame = False
 
             # (Re)Initialize the current frame
-            self.current_frame = np.empty((2464, 3296), dtype=np.uint8)
+            #self.current_frame = np.empty((3040, 4056, 3), dtype=np.uint8)
 
             # If in advance, wait, otherwise skip frames
             self.wait_or_catchup_by_skipping_frames()
@@ -120,26 +125,44 @@ class Recorder:
                 if not self.skip_frame:
                     self.log_progress()
 
-                    self.annotate_frame()
+                    #self.annotate_frame()
 
-                    self.async_frame_capture()
-                    time.sleep(0.5)
+                    #self.async_frame_capture()
+                    print("before capture")
+                    print(self.get_last_save_path())
 
-            except picamera.exc.PiCameraRuntimeError as error:
-                self.logger.log("Error 1 on frame %d" % self.current_frame_number)
-                self.logger.log("Timeout Error : Frame %d skipped" % self.current_frame_number, begin="\n    WARNING    ", end="\n")
-                self.logger.log(error)
-                self.skip_frame = True
-                if self.number_of_skipped_frames == 0:
-                    self.number_of_skipped_frames += 1
-                    continue
-                # Already one frame has been skipped -> camera probably stuck
-                else:
-                    self.logger.log("Warning : Camera seems stuck... Trying to restart it")
-                    del self.camera
-                    self.camera = Camera(parameters=self.parameters)
-                    #raise CrashTimeOutException(self.current_frame_number)
-                # sys.exit()
+                    #self.camera.pre_callback = self.annotate_frame
+
+
+                    self.camera.capture_file(self.get_last_save_path())
+
+                    #self.camera.capture_file("/home/matthieu/test.jpg")
+
+                    #print(self.camera.capture_metadata())
+
+                    # request = self.camera.capture_request()
+                    # request.save("main", self.get_last_save_path())
+                    # print(request.get_metadata())  # this is the metadata for this image
+                    # request.release()
+
+                    print("after capture")
+                    #time.sleep(0.5) #still usefull ?
+
+            # except picamera.exc.PiCameraRuntimeError as error:
+            #     self.logger.log("Error 1 on frame %d" % self.current_frame_number)
+            #     self.logger.log("Timeout Error : Frame %d skipped" % self.current_frame_number, begin="\n    WARNING    ", end="\n")
+            #     self.logger.log(error)
+            #     self.skip_frame = True
+            #     if self.number_of_skipped_frames == 0:
+            #         self.number_of_skipped_frames += 1
+            #         continue
+            #     # Already one frame has been skipped -> camera probably stuck
+            #     else:
+            #         self.logger.log("Warning : Camera seems stuck... Trying to restart it")
+            #         del self.camera
+            #         self.camera = Camera(parameters=self.parameters)
+            #         #raise CrashTimeOutException(self.current_frame_number)
+            #     # sys.exit()
             except RuntimeError:
                 # Never occurs actually
                 self.logger.log("Error 2 on frame %d" % self.current_frame_number)
@@ -148,8 +171,8 @@ class Recorder:
                 #TODO : write doc about why this check is useful
                 if self.get_last_save_path() is not None:
                     # new process for saving
-                    self.save_process = multiprocessing.Process(target=self.save_frame)
-                    self.save_process.start()
+                    # self.save_process = multiprocessing.Process(target=self.save_frame)
+                    # self.save_process.start()
                     #self.save_frame()
 
                     if self.is_time_for_compression():
@@ -205,12 +228,24 @@ class Recorder:
                             f"/ {self.n_frames_total}", begin="\r", end="")
 
 
-    def annotate_frame(self):
+    def annotate_frame(self, request):
         if self.parameters["annotate_frames"]:
-            string_time = (datetime.now()).strftime('%Y-%m-%d %H:%M:%S')
-            string_to_overlay = "%s | %s | %s" % (gethostname(), self.get_filename(), string_time)
 
-            self.camera.annotate_text = string_to_overlay
+            name = self.parameters["recording_name"]
+
+            colour = (0, 255, 0)
+            origin = (0, 20)
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            scale = 0.5
+            thickness = 1
+
+            string_time = (datetime.now()).strftime('%Y-%m-%d %H:%M:%S')
+            string_to_overlay = "%s | %s | %s | %s" % (gethostname(), self.get_filename(), string_time, name)
+
+            with MappedArray(request, "main") as m:
+                cv2.putText(m.array, string_to_overlay, origin, font, scale, colour, thickness)
+
+            #self.camera.annotate_text = string_to_overlay
 
     def save_pic_to_frame(self, new_pic):
         #self.output_lock.acquire()
@@ -220,8 +255,9 @@ class Recorder:
     def async_frame_capture(self):
         output = npi.NPImage()
         if self.parameters["average"] == 1:
-            self.camera.capture(output, 'yuv', use_video_port=False)
-            self.current_frame = output.get_data()
+            #self.camera.capture(output, 'yuv', use_video_port=False)
+            #self.current_frame = output.get_data()
+            self.current_frame = self.camera.capture_array
         else:
             #self.output_lock = Lock()
 
@@ -279,17 +315,19 @@ class Recorder:
         dir_to_compress = self.get_current_dir()
         self.logger.log("Dir_to_compress : %s" % dir_to_compress)
         #log("Dest path : %s " % output_folder)
-        self.save_process.join()
+        #self.save_process.join()
         self.compress_process = multiprocessing.Process(target=self.compress_and_upload, args=(dir_to_compress,))
         self.compress_process.start()
 
     def compress_and_upload(self,folder_name):
+        print("start compression")
         self.compress(folder_name=folder_name)
         if self.parameters["use_samba"] is True:
             file_to_upload = f'{folder_name}.tgz'
             #print(f"#DEBUG uploading {file_to_upload}")
             while self.upload_failed(file_to_upload):
                 ok = self.smbupload(file_to_upload=file_to_upload)
+                print("ok")
 
             #if ok is True:
             subprocess.run(['rm', '-rf', '%s' % folder_name])
@@ -298,6 +336,8 @@ class Recorder:
                 # TODO handle that better
                 #log("something went wrong wile uploading")
                 #raise Exception
+
+        print("compression done")
 
     def upload_failed(self, uploaded_file):
         out_str = self.smbcommand("ls").stdout.decode("utf-8")
@@ -329,7 +369,7 @@ class Recorder:
         return True
 
     def create_smb_tree_structure(self):
-        folder1 = (datetime.now()).strftime("%Y%m%d_%H%M")
+        folder1 = f'{(datetime.now()).strftime("%Y%m%d_%H%M")}{self.parameters["recording_name"]}'
         folder2 = gethostname()
         self.smbcommand(command=f'mkdir {folder1}', working_dir=self.parameters["smb_dir"])
         self.smbcommand(command=f'mkdir {folder1}/{folder2}', working_dir=self.parameters["smb_dir"])
@@ -460,3 +500,4 @@ class Recorder:
         if self.parameters["timeout"] == 0:
             return False
         return True
+

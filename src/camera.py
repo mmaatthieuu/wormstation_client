@@ -1,11 +1,14 @@
-import picamera
+#import picamera
 import time
+
+from picamera2 import Picamera2
+from picamera2.controls import Controls
 
 from src.cam_lib import *
 from parameters import Parameters
 
 
-class Camera(picamera.PiCamera):
+class Camera(Picamera2):
     def __init__(self, parameters):
 
         try:
@@ -16,37 +19,29 @@ class Camera(picamera.PiCamera):
         if framerate > 20:
             framerate = 20
 
-        super(Camera, self).__init__(resolution='3296x2464', framerate=framerate)
+        super(Camera, self).__init__()
 
-        self.iso = parameters["ISO"]
-        #self.framerate = 1000000 / (parameters["shutter_speed"])
-        #self.framerate = 0.1
-        picamera.PiCamera.CAPTURE_TIMEOUT = parameters["capture_timeout"]
+        config = self.create_still_configuration()
 
 
 
-        if parameters["verbosity_level"] > 0:
-            log("Starting camera...")
-        #time.sleep(1)
+        self.configure(config)
 
-        self.exposure_mode = "off"
-        #g = self.awb_gains
-        self.awb_mode = "off"
-        self.awb_gains = 1
+        ctrls = Controls(self)
+        ctrls.AnalogueGain = 1.0
+        # ctrls.DigitalGain = 1.0
+        ctrls.ExposureTime = 10000
+        ctrls.AeEnable = False
+        ctrls.AwbEnable = False
+        ctrls.ColourGains = (1.0, 1.0)
 
-        # fix the shutter speed
-        self.shutter_speed = parameters["shutter_speed"]
+        self.set_controls(ctrls)
 
-        set_analog_gain(self, 1)
-        set_digital_gain(self, 1)
+        #self.pre_callback = apply_timestamp
 
-        #time.sleep(0.5)
-        self.brightness = parameters["brightness"]
-        #print(self.brightness)
-
-        log("Camera successfully started")
-        log(f"Actual shutter speed : {self.shutter_speed}")
 
     def __del__(self):
         log("Closing camera")
         self.close()
+
+
