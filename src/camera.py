@@ -30,7 +30,7 @@ class Camera(Picamera2):
         ctrls = Controls(self)
         ctrls.AnalogueGain = 1.0
         # ctrls.DigitalGain = 1.0
-        ctrls.ExposureTime = 10000
+        ctrls.ExposureTime = parameters["shutter_speed"]
         ctrls.AeEnable = False
         ctrls.AwbEnable = False
         ctrls.ColourGains = (1.0, 1.0)
