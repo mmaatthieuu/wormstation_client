@@ -128,8 +128,8 @@ class Recorder:
                     #self.annotate_frame()
 
                     #self.async_frame_capture()
-                    print("before capture")
-                    print(self.get_last_save_path())
+                    #print("before capture")
+                    #print(self.get_last_save_path())
 
                     #self.camera.pre_callback = self.annotate_frame
 
@@ -145,7 +145,7 @@ class Recorder:
                     # print(request.get_metadata())  # this is the metadata for this image
                     # request.release()
 
-                    print("after capture")
+                    #print("after capture")
                     #time.sleep(0.5) #still usefull ?
 
             # except picamera.exc.PiCameraRuntimeError as error:
