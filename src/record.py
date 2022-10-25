@@ -234,10 +234,10 @@ class Recorder:
             name = self.parameters["recording_name"]
 
             colour = (0, 255, 0)
-            origin = (0, 20)
+            origin = (0, 40)
             font = cv2.FONT_HERSHEY_SIMPLEX
-            scale = 0.5
-            thickness = 1
+            scale = 1
+            thickness = 2
 
             string_time = (datetime.now()).strftime('%Y-%m-%d %H:%M:%S')
             string_to_overlay = "%s | %s | %s | %s" % (gethostname(), self.get_filename(), string_time, name)
