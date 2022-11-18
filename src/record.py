@@ -197,6 +197,7 @@ class Recorder:
                      self.parameters["start_frame"] * self.parameters["time_interval"]
 
         # If too early, wait until it is time to record
+        print(self.delay)
         if self.delay < 0:
             time.sleep(-self.delay)
             if self.parameters["verbosity_level"] >= 2:
