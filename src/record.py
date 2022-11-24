@@ -137,6 +137,8 @@ class Recorder:
                     #self.camera.capture_file(self.get_last_save_path())
                     capture_request = self.camera.capture_request()
                     capture_request.save("main", self.get_last_save_path())
+                    self.logger.log(capture_request.get_metadata())
+                    capture_request.release()
                     #self.camera.capture_file("/home/matthieu/test.jpg")
 
                     #print(self.camera.capture_metadata())
