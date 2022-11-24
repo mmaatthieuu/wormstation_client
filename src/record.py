@@ -12,7 +12,7 @@ import cv2
 
 from math import log10, ceil
 
-from threading import Thread, Lock
+#from threading import Thread, Lock
 import multiprocessing
 
 import psutil
@@ -71,9 +71,9 @@ class Recorder:
         #print(self.git_version)
 
         #self.output = None
-        self.output_lock = None
-        if self.parameters["average"] != 1:
-            self.output_lock = Lock()
+        #self.output_lock = None
+        #if self.parameters["average"] != 1:
+        #    self.output_lock = Lock()
 
         subprocess.run(['cpulimit', '-P', '/usr/bin/gzip', '-l', '10', '-b', '-q'])
 
@@ -134,8 +134,9 @@ class Recorder:
                     #self.camera.pre_callback = self.annotate_frame
 
 
-                    self.camera.capture_file(self.get_last_save_path())
-
+                    #self.camera.capture_file(self.get_last_save_path())
+                    capture_request = self.camera.capture_request()
+                    capture_request.save("main", self.get_last_save_path())
                     #self.camera.capture_file("/home/matthieu/test.jpg")
 
                     #print(self.camera.capture_metadata())
@@ -199,7 +200,11 @@ class Recorder:
         # If too early, wait until it is time to record
         print(self.delay)
         if self.delay < 0:
-            time.sleep(-self.delay)
+            try:
+                time.sleep(-self.delay)
+            except BlockingIOError:
+                self.logger.log("\n\n it failed but still trying")
+                time.sleep(-self.delay)
             if self.parameters["verbosity_level"] >= 2:
                 self.logger.log("Waiting for %fs" % -self.delay)
         elif self.delay < 0.01:  # We need some tolerance in this world...
@@ -248,11 +253,14 @@ class Recorder:
 
             #self.camera.annotate_text = string_to_overlay
 
+    '''
     def save_pic_to_frame(self, new_pic):
         #self.output_lock.acquire()
         self.current_frame = self.current_frame + new_pic // self.parameters["average"]
         #self.output_lock.release()
+    '''
 
+    '''
     def async_frame_capture(self):
         output = npi.NPImage()
         if self.parameters["average"] == 1:
@@ -282,6 +290,7 @@ class Recorder:
                     break
             for t in threads:
                 t.join()
+    '''
 
     def save_frame(self):
         """
