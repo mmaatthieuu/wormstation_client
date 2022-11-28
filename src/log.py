@@ -8,8 +8,10 @@ class Logger:
         self.path = self.init_path(save_log)
 
 
-    def log(self, log_msg, begin="", end="\n", log_level=2):
+    def log(self, log_msg, begin="", end="\n", log_level=None):
+        if log_level is None: log_level=self.verbosity_level
         if log_level <= self.verbosity_level:
+            print("log")
             string = f'{begin}[{str(dt.datetime.now())}] : {log_msg}'
             if self.path is None:
                 print(string, end=end)
