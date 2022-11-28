@@ -9,7 +9,7 @@ class Logger:
 
 
     def log(self, log_msg, begin="", end="\n", log_level=2):
-        if log_level >= self.verbosity_level:
+        if log_level <= self.verbosity_level:
             string = f'{begin}[{str(dt.datetime.now())}] : {log_msg}'
             if self.path is None:
                 print(string, end=end)
