@@ -125,20 +125,54 @@ class Recorder:
                 if not self.skip_frame:
                     self.log_progress()
 
-                    #self.annotate_frame()
+                    # self.annotate_frame()
 
-                    #self.async_frame_capture()
-                    #print("before capture")
-                    #print(self.get_last_save_path())
+                    # self.async_frame_capture()
+                    # print("before capture")
+                    # print(self.get_last_save_path())
 
-                    #self.camera.pre_callback = self.annotate_frame
+                    # self.camera.pre_callback = self.annotate_frame
 
+                    ## That was randomly crashing so we used the next method
+                    # self.camera.capture_file(self.get_last_save_path())
 
-                    #self.camera.capture_file(self.get_last_save_path())
+                    ## That is the new method
                     capture_request = self.camera.capture_request()
                     capture_request.save("main", self.get_last_save_path())
-                    self.logger.log(capture_request.get_metadata())
+                    self.logger.log(capture_request.get_metadata(), log_level=2)
                     capture_request.release()
+
+                    ### From the documentation :
+                    '''
+                    https://datasheets.raspberrypi.com/camera/picamera2-manual.pdf
+                    
+                    Moving processing out of the camera thread
+                    Normally when we use a function like Picamera2.capture_file, 
+                    the processing to capture the image, compress it as (for
+                    example) a JPEG, and save it to file happens in the usual camera 
+                    processing loop. While this happens, the handling of
+                    camera events is blocked and the camera system is likely to drop 
+                    some frames. In many cases this is not terribly
+                    important, but there are occasions when we might prefer all the 
+                    processing to happen somewhere else.
+                    
+                    Just as an example, if we were recording a video and wanted to capture
+                     a JPEG simultaneously whilst minimising the
+                    risk of dropping any video frames, then it would be beneficial 
+                    to move that processing out of the camera loop.
+                    
+                    This is easily accomplished simply by capturing a request and calling
+                     request.save as we saw above. Camera events can
+                    still be handled in parallel (though this is somewhat at the mercy of 
+                    Python’s multi-tasking abilities), and the only
+                    downside is that camera system has to make do with one less set of 
+                    buffers until that request is finally released.
+                    However, this can in turn always be mitigated by allocating one or 
+                    more extra sets of buffers via the camera
+                    configuration’s buffer_count parameter.
+                    '''
+
+
                     #self.camera.capture_file("/home/matthieu/test.jpg")
 
                     #print(self.camera.capture_metadata())

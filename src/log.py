@@ -8,14 +8,15 @@ class Logger:
         self.path = self.init_path(save_log)
 
 
-    def log(self, log_msg, begin="", end="\n"):
-        string = f'{begin}[{str(dt.datetime.now())}] : {log_msg}'
-        if self.path is None:
-            print(string, end=end)
-        else:
-            with open(self.path, 'a') as log_file:
-                print(string, end=end, file=log_file)
-                #log_file.write(string)
+    def log(self, log_msg, begin="", end="\n", log_level=2):
+        if log_level >= self.verbosity_level:
+            string = f'{begin}[{str(dt.datetime.now())}] : {log_msg}'
+            if self.path is None:
+                print(string, end=end)
+            else:
+                with open(self.path, 'a') as log_file:
+                    print(string, end=end, file=log_file)
+                    #log_file.write(string)
 
     def init_path(self, save_log):
         if save_log:
