@@ -17,6 +17,7 @@ import multiprocessing
 
 import psutil
 import pathlib
+import shutil
 
 from src.camera import Camera
 from src.tlc5940.tlc import tlc5940
@@ -410,6 +411,15 @@ class Recorder:
         if file_to_upload is not None:
             command = f'put {file_to_upload} {filename_at_destination}'
             ok = self.smbcommand(command)
+
+            extension = pathlib.Path(file_to_upload).suffix
+
+            if ok and extension == ".tgz":
+                #print(ok)
+                try:
+                    os.remove(file_to_upload)
+                except OSError as e:
+                    print("Error: %s - %s." % (e.filename, e.strerror))
 
             return ok
         return True
