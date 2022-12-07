@@ -17,10 +17,9 @@ import multiprocessing
 
 import psutil
 import pathlib
-import shutil
 
 from src.camera import Camera
-from src.tlc5940.tlc import tlc5940
+# from src.tlc5940.tlc import tlc5940
 import os
 import subprocess
 from pathlib import Path
