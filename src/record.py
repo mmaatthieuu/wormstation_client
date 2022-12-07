@@ -121,6 +121,9 @@ class Recorder:
             self.wait_or_catchup_by_skipping_frames()
 
             self.start_time_current_frame = time.time()
+
+            print(self.camera.camera_properties["PixelArraySize"])
+
             try:
                 if not self.skip_frame:
                     self.log_progress()
@@ -139,7 +142,7 @@ class Recorder:
                     ## That is the new method
                     capture_request = self.camera.capture_request()
                     capture_request.save("main", self.get_last_save_path())
-                    self.logger.log(capture_request.get_metadata(), log_level=2)
+                    # self.logger.log(capture_request.get_metadata(), log_level=2)
                     capture_request.release()
 
                     ### From the documentation :
@@ -171,7 +174,9 @@ class Recorder:
                     more extra sets of buffers via the camera
                     configuration’s buffer_count parameter.
                     '''
-
+                else:
+                    # If frame is skipped, save a black frame to keep continuous numbering
+                    self.save_black_frame(self.get_last_save_path())
 
                     #self.camera.capture_file("/home/matthieu/test.jpg")
 
@@ -284,8 +289,13 @@ class Recorder:
             string_time = (datetime.now()).strftime('%Y-%m-%d %H:%M:%S')
             string_to_overlay = "%s | %s | %s | %s" % (gethostname(), self.get_filename(), string_time, name)
 
-            with MappedArray(request, "main") as m:
-                cv2.putText(m.array, string_to_overlay, origin, font, scale, colour, thickness)
+            try:
+                with MappedArray(request, "main") as m:
+                    cv2.putText(m.array, string_to_overlay, origin, font, scale, colour, thickness)
+            except AttributeError:
+                # In case the function is called for a black frame, so the request is actually a np.array and
+                # not a picam2 request
+                return cv2.putText(request, string_to_overlay, origin, font, scale, colour, thickness)
 
             #self.camera.annotate_text = string_to_overlay
 
@@ -339,6 +349,16 @@ class Recorder:
 
         self.write_extended_attributes(save_path=save_path)
 
+    def save_black_frame(self, path):
+
+        # Create array with the right size, i.e. sensor resolution. The [::-1] reverse the tuple order, otherwise
+        # the picture is in portrait mode rather than landscape.
+        # The +(3,) is used to append 3 (i.e. the number of RGB channels) to create a RGB image
+
+        zero_array = np.zeros((self.camera.camera_properties["PixelArraySize"])[::-1]+(3,), dtype=np.uint8)
+        zero_array = self.annotate_frame(zero_array)
+        image = im.fromarray(zero_array)
+        image.save(path)
 
 
     def is_time_for_compression(self):
