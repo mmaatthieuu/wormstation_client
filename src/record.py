@@ -66,7 +66,7 @@ class Recorder:
 
         self.git_version = git_version
 
-        subprocess.run(['cpulimit', '-P', '/usr/bin/gzip', '-l', '10', '-b', '-q'])
+        #subprocess.run(['cpulimit', '-P', '/usr/bin/gzip', '-l', '10', '-b', '-q'])
 
         # TODO pool instead of single process
         self.compress_process = None
@@ -74,7 +74,7 @@ class Recorder:
 
     def __del__(self):
         self.logger.log("Closing recorder")
-        subprocess.run(['pkill', 'cpulimit'])
+        #subprocess.run(['pkill', 'cpulimit'])
         del self.camera
 
     def start_recording(self):
@@ -85,6 +85,7 @@ class Recorder:
         # TODO : add git number to json file and maybe add check if git version is the same as current one ?
         # TODO : confirm parameters & check if folder already exists
         # TODO : check if samba config is working
+        # TODO : clean tmp local dir
 
         # Go to home directory
         self.go_to_tmp_recording_folder()
@@ -123,7 +124,7 @@ class Recorder:
                     # self.camera.capture_file(self.get_last_save_path())
 
                     ##DEBUG
-                    #start_time = time.time()
+                    start_time = time.time()
 
                     ## That is the new method
                     capture_request = self.camera.capture_request()
@@ -132,18 +133,18 @@ class Recorder:
                     capture_request.release()
 
                     ## DEBUG :
-                    #end_time = time.time()
-                    #execution_time = end_time - start_time
-                    #print("Execution time:", execution_time, "seconds")
+                    end_time = time.time()
+                    execution_time = end_time - start_time
+                    print("Execution time:", execution_time, "seconds")
 
-                    #avg_time = avg_time + execution_time
+                    avg_time = avg_time + execution_time
 
-                    #if self.current_frame_number == 0:
-                    #    min_time = execution_time
-                    #    max_time = execution_time
-                    #else:
-                    #    if execution_time<min_time:min_time=execution_time
-                    #    if execution_time>max_time:max_time=execution_time
+                    if self.current_frame_number == 0:
+                        min_time = execution_time
+                        max_time = execution_time
+                    else:
+                        if execution_time<min_time:min_time=execution_time
+                        if execution_time>max_time:max_time=execution_time
 
                     ### From the documentation :
                     '''
@@ -193,7 +194,7 @@ class Recorder:
 
                     if self.is_time_for_compression():
                         self.logger.log("time for compression")
-                        self.start_async_compression_and_upload()
+                        self.start_async_compression_and_upload(format="mkv")
 
                     if self.parameters["use_samba"] and self.is_it_useful_to_save_logs():
                         self.async_smbupload(file_to_upload=self.logger.get_log_file_path(),
@@ -202,10 +203,10 @@ class Recorder:
                 self.create_symlink_to_last_frame()
 
         ## DEBUG
-        #avg_time = avg_time / float(self.n_frames_total)
+        avg_time = avg_time / float(self.n_frames_total)
 
-        #print("average time over " + str(self.n_frames_total) + " frames is " + str(avg_time) +
-        #      "\nMin : " + str(min_time) + "\nMax : " + str(max_time))
+        print("average time over " + str(self.n_frames_total) + " frames is " + str(avg_time) +
+              "\nMin : " + str(min_time) + "\nMax : " + str(max_time))
 
     def wait_or_catchup_by_skipping_frames(self):
         # Wait
@@ -313,30 +314,37 @@ class Recorder:
             return False
 
 
-    def start_async_compression_and_upload(self):
+    def start_async_compression_and_upload(self, format):
         dir_to_compress = self.get_current_dir()
         self.logger.log("Dir_to_compress : %s" % dir_to_compress)
         #log("Dest path : %s " % output_folder)
         #self.save_process.join()
-        self.compress_process = multiprocessing.Process(target=self.compress_and_upload, args=(dir_to_compress,))
+        self.compress_process = multiprocessing.Process(target=self.compress_and_upload,
+                                                        args=(dir_to_compress, format,))
         self.compress_process.start()
 
-    def compress_and_upload(self,folder_name):
+    def compress_and_upload(self, folder_name, format):
         print("start compression")
-        compressed_file = self.compress(folder_name=folder_name, format="mkv")
+        compressed_file = self.compress(folder_name=folder_name, format=format)
         if self.parameters["use_samba"] is True:
             file_to_upload = compressed_file
             #print(f"#DEBUG uploading {file_to_upload}")
             ok = False
             n_trials = 0
-            while self.upload_failed(file_to_upload) or n_trials > 5:
-                ok = self.smbupload(file_to_upload=file_to_upload)
-                n_trials = n_trials+1
+            try:
+                while self.upload_failed(file_to_upload):
+                    ok = self.smbupload(file_to_upload=file_to_upload)
+                    n_trials = n_trials+1
 
-            if ok is True:
+                    if n_trials > 5:
+                        raise TimeoutError("Uplaod failed")
+
                 subprocess.run(['rm', '-rf', '%s' % folder_name])
-            else:
-                self.logger.log("Error while uploading")
+                subprocess.run(['rm', '-rf', '%s.%s' % (folder_name, format)])
+            except TimeoutError as e:
+                self.logger.log(e)
+
+
                 # TODO : handle files that have not been uploaded
             #subprocess.run(['rm', '-rf', '%s.tgz' % folder_name])
             #else:
@@ -366,10 +374,11 @@ class Recorder:
             call_args = ['ffmpeg', '-r', '25', '-pattern_type', 'glob', '-i',
                          input_files, '-vcodec', 'libx264',
                          '-crf', '22', '-y',
-                         '-refs', '4', '-preset', 'veryfast', '-profile:v',
-                         'main', '-threads', '2', output_file]
+                         '-refs', '2', '-preset', 'veryfast', '-profile:v',
+                         'main', '-threads', '4', '-hide_banner',
+                         '-loglevel', 'warning', output_file]
 
-        subprocess.run(call_args)
+        subprocess.run(call_args, stdout=subprocess.DEVNULL)
 
         self.logger.log("Compression of %s done" % folder_name, begin="\n")
 
@@ -440,7 +449,10 @@ class Recorder:
         try:
             os.mkdir(self.parameters["local_tmp_dir"])
         except FileExistsError:
+            #os.remove(self.parameters["local_tmp_dir"])
+            #os.mkdir(self.parameters["local_tmp_dir"])
             pass
+
 
         os.chdir(self.parameters["local_tmp_dir"])
 
