@@ -111,6 +111,8 @@ class Recorder:
 
         #self.create_output_folder()
 
+        avg_time = 0;
+
         # Main recording loop
         for self.current_frame_number in range(self.parameters["start_frame"], self.n_frames_total):
             self.skip_frame = False
@@ -137,11 +139,28 @@ class Recorder:
                     ## That was randomly crashing so we used the next method
                     # self.camera.capture_file(self.get_last_save_path())
 
+                    ##DEBUG
+                    start_time = time.time()
+
                     ## That is the new method
                     capture_request = self.camera.capture_request()
                     capture_request.save("main", self.get_last_save_path())
                     self.logger.log(capture_request.get_metadata(), log_level=2)
                     capture_request.release()
+
+                    ## DEBUG :
+                    end_time = time.time()
+                    execution_time = end_time - start_time
+                    print("Execution time:", execution_time, "seconds")
+
+                    avg_time = avg_time + execution_time
+
+                    if self.current_frame_number == 0:
+                        min_time = execution_time
+                        max_time = execution_time
+                    else:
+                        if execution_time<min_time:min_time=execution_time
+                        if execution_time>max_time:max_time=execution_time
 
                     ### From the documentation :
                     '''
@@ -206,6 +225,7 @@ class Recorder:
                 self.logger.log("Error 2 on frame %d" % self.current_frame_number)
 
             finally:
+
                 #TODO : write doc about why this check is useful
                 if self.get_last_save_path() is not None:
                     # new process for saving
@@ -217,15 +237,17 @@ class Recorder:
                         self.logger.log("time for compression")
                         self.start_async_compression_and_upload()
 
-                    if self.parameters["use_samba"]:
-                        self.async_smbupload(file_to_upload=self.logger.get_log_file_path(),
-                                             filename_at_destination=self.logger.get_log_filename())
+                    if self.parameters["use_samba"] and self.is_it_useful_to_save_logs():
                         self.async_smbupload(file_to_upload=self.logger.get_log_file_path(),
                                              filename_at_destination=self.logger.get_log_filename())
                 #create link to last frame
                 self.create_symlink_to_last_frame()
 
+        ## DEBUG
+        avg_time = avg_time / float(self.n_frames_total)
 
+        print("average time over " + str(self.n_frames_total) + " frames is " + str(avg_time) +
+              "\nMin : " + str(min_time) + "\nMax : " + str(max_time))
 
     def wait_or_catchup_by_skipping_frames(self):
         # Wait
@@ -368,16 +390,16 @@ class Recorder:
 
     def compress_and_upload(self,folder_name):
         print("start compression")
-        self.compress(folder_name=folder_name)
+        compressed_file = self.compress(folder_name=folder_name, format="mkv")
         if self.parameters["use_samba"] is True:
-            file_to_upload = f'{folder_name}.tgz'
+            file_to_upload = compressed_file
             #print(f"#DEBUG uploading {file_to_upload}")
             while self.upload_failed(file_to_upload):
                 ok = self.smbupload(file_to_upload=file_to_upload)
                 print("ok")
 
             #if ok is True:
-            subprocess.run(['rm', '-rf', '%s' % folder_name])
+            #subprocess.run(['rm', '-rf', '%s' % folder_name])
             #subprocess.run(['rm', '-rf', '%s.tgz' % folder_name])
             #else:
                 # TODO handle that better
@@ -391,16 +413,35 @@ class Recorder:
         return uploaded_file not in out_str
 
 
-    def compress(self, folder_name):
+    def compress(self, folder_name, format = "tgz"):
         pid = psutil.Process(os.getpid())
 
         pid.nice(19)
         self.logger.log("Starting compression of %s" % folder_name)
 
-        call_args = ['tar', '--xattrs', '-czf', '%s.tgz' % folder_name, '-C', '%s' % folder_name, '.']
+        if format == "tgz":
+            output_file = '%s.tgz' % folder_name
+            call_args = ['tar', '--xattrs', '-czf', output_file , '-C', '%s' % folder_name, '.']
+        else:
+            input_files = str(pathlib.Path(folder_name).absolute()) + '/*.jpg'
+            output_file = '%s.mkv' % folder_name
+            call_args = ['ffmpeg', '-r', '25', '-pattern_type', 'glob', '-i',
+                         input_files, '-vcodec', 'libx264',
+                         '-crf', '22', '-y',
+                         '-refs', '4', '-preset', 'veryfast', '-profile:v',
+                         'main', '-threads', '2', output_file]
+            #call_args = ['ffmpeg', '-r', '25', '-pattern_type', 'glob', '-i',
+            #             str(pathlib.Path(folder_name).absolute()) + '/*.jpg', '-vcodec', 'libx264',
+            #             output_file]
+
+        print(pathlib.Path(folder_name).absolute())
+        print(call_args)
         subprocess.run(call_args)
 
-        self.logger.log("Compression of %s done" % folder_name,begin="\n")
+        self.logger.log("Compression of %s done" % folder_name, begin="\n")
+
+        return output_file
+
 
     def async_smbupload(self, file_to_upload, filename_at_destination=""):
         upload_proc = multiprocessing.Process(target=self.smbupload,
@@ -558,5 +599,10 @@ class Recorder:
     def is_it_useful_to_save_logs(self):
         if self.parameters["timeout"] == 0:
             return False
+        try:
+            if self.parameters["save_logs"] is False:
+                return False
+        except KeyError:
+            pass
         return True
 
