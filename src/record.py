@@ -17,10 +17,9 @@ import multiprocessing
 
 import psutil
 import pathlib
-import shutil
 
 from src.camera import Camera
-from src.tlc5940.tlc import tlc5940
+# from src.tlc5940.tlc import tlc5940
 import os
 import subprocess
 from pathlib import Path
@@ -66,15 +65,6 @@ class Recorder:
         self.start_time_current_frame = 0
 
         self.git_version = git_version
-
-
-
-        #print(self.git_version)
-
-        #self.output = None
-        #self.output_lock = None
-        #if self.parameters["average"] != 1:
-        #    self.output_lock = Lock()
 
         subprocess.run(['cpulimit', '-P', '/usr/bin/gzip', '-l', '10', '-b', '-q'])
 
@@ -124,17 +114,10 @@ class Recorder:
             self.wait_or_catchup_by_skipping_frames()
 
             self.start_time_current_frame = time.time()
+
             try:
                 if not self.skip_frame:
                     self.log_progress()
-
-                    # self.annotate_frame()
-
-                    # self.async_frame_capture()
-                    # print("before capture")
-                    # print(self.get_last_save_path())
-
-                    # self.camera.pre_callback = self.annotate_frame
 
                     ## That was randomly crashing so we used the next method
                     # self.camera.capture_file(self.get_last_save_path())
@@ -145,7 +128,7 @@ class Recorder:
                     ## That is the new method
                     capture_request = self.camera.capture_request()
                     capture_request.save("main", self.get_last_save_path())
-                    self.logger.log(capture_request.get_metadata(), log_level=2)
+                    # self.logger.log(capture_request.get_metadata(), log_level=2)
                     capture_request.release()
 
                     ## DEBUG :
@@ -191,35 +174,10 @@ class Recorder:
                     more extra sets of buffers via the camera
                     configuration’s buffer_count parameter.
                     '''
+                else:
+                    # If frame is skipped, save a black frame to keep continuous numbering
+                    self.save_black_frame(self.get_last_save_path())
 
-
-                    #self.camera.capture_file("/home/matthieu/test.jpg")
-
-                    #print(self.camera.capture_metadata())
-
-                    # request = self.camera.capture_request()
-                    # request.save("main", self.get_last_save_path())
-                    # print(request.get_metadata())  # this is the metadata for this image
-                    # request.release()
-
-                    #print("after capture")
-                    #time.sleep(0.5) #still usefull ?
-
-            # except picamera.exc.PiCameraRuntimeError as error:
-            #     self.logger.log("Error 1 on frame %d" % self.current_frame_number)
-            #     self.logger.log("Timeout Error : Frame %d skipped" % self.current_frame_number, begin="\n    WARNING    ", end="\n")
-            #     self.logger.log(error)
-            #     self.skip_frame = True
-            #     if self.number_of_skipped_frames == 0:
-            #         self.number_of_skipped_frames += 1
-            #         continue
-            #     # Already one frame has been skipped -> camera probably stuck
-            #     else:
-            #         self.logger.log("Warning : Camera seems stuck... Trying to restart it")
-            #         del self.camera
-            #         self.camera = Camera(parameters=self.parameters)
-            #         #raise CrashTimeOutException(self.current_frame_number)
-            #     # sys.exit()
             except RuntimeError:
                 # Never occurs actually
                 self.logger.log("Error 2 on frame %d" % self.current_frame_number)
@@ -307,49 +265,14 @@ class Recorder:
             string_time = (datetime.now()).strftime('%Y-%m-%d %H:%M:%S')
             string_to_overlay = "%s | %s | %s | %s" % (gethostname(), self.get_filename(), string_time, name)
 
-            with MappedArray(request, "main") as m:
-                cv2.putText(m.array, string_to_overlay, origin, font, scale, colour, thickness)
+            try:
+                with MappedArray(request, "main") as m:
+                    cv2.putText(m.array, string_to_overlay, origin, font, scale, colour, thickness)
+            except AttributeError:
+                # In case the function is called for a black frame, so the request is actually a np.array and
+                # not a picam2 request
+                return cv2.putText(request, string_to_overlay, origin, font, scale, colour, thickness)
 
-            #self.camera.annotate_text = string_to_overlay
-
-    '''
-    def save_pic_to_frame(self, new_pic):
-        #self.output_lock.acquire()
-        self.current_frame = self.current_frame + new_pic // self.parameters["average"]
-        #self.output_lock.release()
-    '''
-
-    '''
-    def async_frame_capture(self):
-        output = npi.NPImage()
-        if self.parameters["average"] == 1:
-            #self.camera.capture(output, 'yuv', use_video_port=False)
-            #self.current_frame = output.get_data()
-            self.current_frame = self.camera.capture_array
-        else:
-            #self.output_lock = Lock()
-
-            # TODO repalce threads by processes
-            threads = [None] * self.parameters["average"]
-            for i, fname in enumerate(
-                    self.camera.capture_continuous(output,
-                                                   'yuv', use_video_port=False, burst=False)):
-
-                # Send the computation and saving of the new pic to separated thread
-                # TODO : maybe shortcut that if avg == 1
-                threads[i] = Thread(target=self.save_pic_to_frame, args=(output.get_data(),))
-                print(f"start {i} {fname}")
-                threads[i].start()
-                print(threads[i])
-
-                # Frame has been taken so we can reinitialize the number of skipped frames
-                self.number_of_skipped_frames = 0
-
-                if i == self.parameters["average"] - 1:
-                    break
-            for t in threads:
-                t.join()
-    '''
 
     def save_frame(self):
         """
@@ -362,6 +285,16 @@ class Recorder:
 
         self.write_extended_attributes(save_path=save_path)
 
+    def save_black_frame(self, path):
+
+        # Create array with the right size, i.e. sensor resolution. The [::-1] reverse the tuple order, otherwise
+        # the picture is in portrait mode rather than landscape.
+        # The +(3,) is used to append 3 (i.e. the number of RGB channels) to create a RGB image
+
+        zero_array = np.zeros((self.camera.camera_properties["PixelArraySize"])[::-1]+(3,), dtype=np.uint8)
+        zero_array = self.annotate_frame(zero_array)
+        image = im.fromarray(zero_array)
+        image.save(path)
 
 
     def is_time_for_compression(self):
@@ -534,29 +467,6 @@ class Recorder:
         if digits == 0:
             digits+=1
         return f'%0{digits}d.jpg'
-
-    # def get_local_save_dir(self):
-    #     try:
-    #         if self.parameters["use_samba"] is False:
-    #             # The local dir is the final output
-    #             path = self.parameters["local_output_dir"]
-    #         else:
-    #             # write frames in the tmp local dir, and wait for compression and upload
-    #             path = self.parameters["local_tmp_dir"]
-    #         #return path
-    #         return self.parameters["local_tmp_dir"]
-    #     except TypeError:
-    #         return None
-    #
-    # def create_output_folder(self):
-    #     pass
-    #     # try:
-    #     #     os.mkdir(self.get_local_save_dir())
-    #     #     print(f'#DEBUG {os.getcwd()}/{self.get_local_save_dir()} created')
-    #     # except FileExistsError:
-    #     #     print(f'#DEBUG {self.get_local_save_dir()} already exists')
-    #     #     pass
-
 
     def get_last_save_path(self):
         try:
