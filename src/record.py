@@ -123,7 +123,7 @@ class Recorder:
                     # self.camera.capture_file(self.get_last_save_path())
 
                     ##DEBUG
-                    start_time = time.time()
+                    #start_time = time.time()
 
                     ## That is the new method
                     capture_request = self.camera.capture_request()
@@ -132,18 +132,18 @@ class Recorder:
                     capture_request.release()
 
                     ## DEBUG :
-                    end_time = time.time()
-                    execution_time = end_time - start_time
-                    print("Execution time:", execution_time, "seconds")
+                    #end_time = time.time()
+                    #execution_time = end_time - start_time
+                    #print("Execution time:", execution_time, "seconds")
 
-                    avg_time = avg_time + execution_time
+                    #avg_time = avg_time + execution_time
 
-                    if self.current_frame_number == 0:
-                        min_time = execution_time
-                        max_time = execution_time
-                    else:
-                        if execution_time<min_time:min_time=execution_time
-                        if execution_time>max_time:max_time=execution_time
+                    #if self.current_frame_number == 0:
+                    #    min_time = execution_time
+                    #    max_time = execution_time
+                    #else:
+                    #    if execution_time<min_time:min_time=execution_time
+                    #    if execution_time>max_time:max_time=execution_time
 
                     ### From the documentation :
                     '''
@@ -202,10 +202,10 @@ class Recorder:
                 self.create_symlink_to_last_frame()
 
         ## DEBUG
-        avg_time = avg_time / float(self.n_frames_total)
+        #avg_time = avg_time / float(self.n_frames_total)
 
-        print("average time over " + str(self.n_frames_total) + " frames is " + str(avg_time) +
-              "\nMin : " + str(min_time) + "\nMax : " + str(max_time))
+        #print("average time over " + str(self.n_frames_total) + " frames is " + str(avg_time) +
+        #      "\nMin : " + str(min_time) + "\nMax : " + str(max_time))
 
     def wait_or_catchup_by_skipping_frames(self):
         # Wait
@@ -327,12 +327,17 @@ class Recorder:
         if self.parameters["use_samba"] is True:
             file_to_upload = compressed_file
             #print(f"#DEBUG uploading {file_to_upload}")
-            while self.upload_failed(file_to_upload):
+            ok = False
+            n_trials = 0
+            while self.upload_failed(file_to_upload) or n_trials > 5:
                 ok = self.smbupload(file_to_upload=file_to_upload)
-                print("ok")
+                n_trials = n_trials+1
 
-            #if ok is True:
-            #subprocess.run(['rm', '-rf', '%s' % folder_name])
+            if ok is True:
+                subprocess.run(['rm', '-rf', '%s' % folder_name])
+            else:
+                self.logger.log("Error while uploading")
+                # TODO : handle files that have not been uploaded
             #subprocess.run(['rm', '-rf', '%s.tgz' % folder_name])
             #else:
                 # TODO handle that better
@@ -363,12 +368,7 @@ class Recorder:
                          '-crf', '22', '-y',
                          '-refs', '4', '-preset', 'veryfast', '-profile:v',
                          'main', '-threads', '2', output_file]
-            #call_args = ['ffmpeg', '-r', '25', '-pattern_type', 'glob', '-i',
-            #             str(pathlib.Path(folder_name).absolute()) + '/*.jpg', '-vcodec', 'libx264',
-            #             output_file]
 
-        print(pathlib.Path(folder_name).absolute())
-        print(call_args)
         subprocess.run(call_args)
 
         self.logger.log("Compression of %s done" % folder_name, begin="\n")
@@ -400,7 +400,7 @@ class Recorder:
 
     def create_smb_tree_structure(self):
         try:
-            folder1 = f'{(datetime.now()).strftime("%Y%m%d_%H%M")}{self.parameters["recording_name"]}'
+            folder1 = f'{(datetime.now()).strftime("%Y%m%d_%H%M")}_{self.parameters["recording_name"]}'
         except:
             folder1 = (datetime.now()).strftime("%Y%m%d_%H%M")
         folder2 = gethostname()
