@@ -4,6 +4,7 @@ from datetime import datetime
 from socket import gethostname
 from PIL import Image as im
 
+import RPi.GPIO as GPIO
 
 # import picamera
 import json
@@ -75,7 +76,14 @@ class Recorder:
         self.compress_process = None
         self.save_process = None
 
+        GPIO.setmode(GPIO.BCM)  # set pin numbering mode to BCM
+        GPIO.setup(17, GPIO.OUT)  # set GPIO pin 17 as an output
+
     def __del__(self):
+
+        # clean up the GPIO pins
+        GPIO.cleanup()
+
         self.logger.log("Closing recorder")
         #subprocess.run(['pkill', 'cpulimit'])
         del self.camera
@@ -89,6 +97,8 @@ class Recorder:
         # TODO : confirm parameters & check if folder already exists
         # TODO : check if samba config is working
         # TODO : clean tmp local dir
+
+        self.led_ON()
 
         # Go to home directory
         self.go_to_tmp_recording_folder()
@@ -130,10 +140,25 @@ class Recorder:
                     start_time = time.time()
 
                     ## That is the new method
+                    print(f'Before capture request {time.time()-start_time}')
+                    self.led_OFF()
+
+
+                    #TODO it is working like that, but maybe put led_OFF in new thread
+                    # and try to restart it as soon as possible
+
+
                     capture_request = self.camera.capture_request()
+                    print(f'After capture request {time.time() - start_time}')
+                    self.led_ON()
                     capture_request.save("main", self.get_last_save_path())
+                    print(f'After saving {time.time() - start_time}')
                     # self.logger.log(capture_request.get_metadata(), log_level=2)
+
                     capture_request.release()
+                    print(f'After release {time.time() - start_time}')
+
+                    #self.led_OFF()
 
                     ## DEBUG :
                     end_time = time.time()
@@ -530,4 +555,10 @@ class Recorder:
         except KeyError:
             pass
         return True
+
+    def led_ON(self):
+        GPIO.output(17, GPIO.HIGH)
+
+    def led_OFF(self):
+        GPIO.output(17, GPIO.LOW)
 
