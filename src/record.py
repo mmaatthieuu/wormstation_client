@@ -66,6 +66,7 @@ class Recorder:
 
         self.optogenetic = True
 
+
         self.git_version = git_version
 
         #subprocess.run(['cpulimit', '-P', '/usr/bin/gzip', '-l', '10', '-b', '-q'])
