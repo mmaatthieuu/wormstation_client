@@ -64,6 +64,8 @@ class Recorder:
         self.delay = 0
         self.start_time_current_frame = 0
 
+        self.optogenetic = False
+
         self.git_version = git_version
 
         #subprocess.run(['cpulimit', '-P', '/usr/bin/gzip', '-l', '10', '-b', '-q'])
