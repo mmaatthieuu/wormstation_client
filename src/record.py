@@ -65,7 +65,23 @@ class Recorder:
         self.delay = 0
         self.start_time_current_frame = 0
 
-        self.optogenetic = True
+        self.optogenetic = False
+        self.LED_status = None
+
+        if self.optogenetic:
+            GPIO.setmode(GPIO.BCM)  # set pin numbering mode to BCM
+            GPIO.setup(17, GPIO.OUT)  # set GPIO pin 17 as an output
+
+            self.led_ON()
+
+        # Useful only in case of optogenetic experiment
+        exposure = self.parameters["shutter_speed"] / 1000
+        # Coefficient computed with linear regression between minimal empirical values found for
+        # exposure=10ms and exposure=100ms
+        self.pause_time = 0.001444 * exposure + 0.075555
+        self.delay_time = 0.001 * exposure + 0.08
+        if exposure == 50:
+            self.pause_time = 0.13
 
 
         self.git_version = git_version
@@ -76,13 +92,11 @@ class Recorder:
         self.compress_process = None
         self.save_process = None
 
-        GPIO.setmode(GPIO.BCM)  # set pin numbering mode to BCM
-        GPIO.setup(17, GPIO.OUT)  # set GPIO pin 17 as an output
-
     def __del__(self):
 
         # clean up the GPIO pins
-        GPIO.cleanup()
+        if self.optogenetic:
+            GPIO.cleanup()
 
         self.logger.log("Closing recorder")
         #subprocess.run(['pkill', 'cpulimit'])
@@ -98,7 +112,7 @@ class Recorder:
         # TODO : check if samba config is working
         # TODO : clean tmp local dir
 
-        self.led_ON()
+        #self.led_ON()
 
         # Go to home directory
         self.go_to_tmp_recording_folder()
@@ -140,27 +154,38 @@ class Recorder:
                     start_time = time.time()
 
                     ## That is the new method
-                    print(f'Before capture request {time.time()-start_time}')
-                    self.led_OFF()
+                    #print(f'Before capture request {time.time()-start_time}')
+                    #self.led_OFF()
 
+                    #pause_time = self.parameters["shutter_speed"] / 1000000 + 0.065
+                    #pause_time = 0.075 #(10 ms)
+                    #pause_time = 0.12 #(50 ms)
+                    #pause_time = 0.22
 
-                    #TODO it is working like that, but maybe put led_OFF in new thread
-                    # and try to restart it as soon as possible
+                    if self.optogenetic:
+                        if self.LED_status:
+                            led_pause_process = multiprocessing.Process(target=self.led_pause, args=(self.pause_time,))
+                            led_pause_process.start()
 
+                        # Delay is always applied to avoind incuding a time shift wether LED are ON or OFF
+                        time.sleep(self.delay_time)
+
+                    #print(f'delay = {delay_time}, pause_time = {pause_time}')
+                    #time.sleep(0.13)
+                    #time.sleep(0.18)
 
                     capture_request = self.camera.capture_request()
-                    print(f'After capture request {time.time() - start_time}')
-                    self.led_ON()
+                    #print(f'After capture request {time.time() - start_time}')
+
                     capture_request.save("main", self.get_last_save_path())
-                    print(f'After saving {time.time() - start_time}')
+                    #print(f'After saving {time.time() - start_time}')
                     # self.logger.log(capture_request.get_metadata(), log_level=2)
 
                     capture_request.release()
-                    print(f'After release {time.time() - start_time}')
-
-                    #self.led_OFF()
+                    #print(f'After release {time.time() - start_time}')
 
                     ## DEBUG :
+
                     end_time = time.time()
                     execution_time = end_time - start_time
                     print("Execution time:", execution_time, "seconds")
@@ -173,6 +198,7 @@ class Recorder:
                     else:
                         if execution_time<min_time:min_time=execution_time
                         if execution_time>max_time:max_time=execution_time
+
 
                     ### From the documentation :
                     '''
@@ -367,8 +393,8 @@ class Recorder:
                     if n_trials > 5:
                         raise TimeoutError("Uplaod failed")
 
-                subprocess.run(['rm', '-rf', '%s' % folder_name])
-                subprocess.run(['rm', '-rf', '%s.%s' % (folder_name, format)])
+                #subprocess.run(['rm', '-rf', '%s' % folder_name])
+                #subprocess.run(['rm', '-rf', '%s.%s' % (folder_name, format)])
             except TimeoutError as e:
                 self.logger.log(e)
 
@@ -389,7 +415,7 @@ class Recorder:
 
     def compress(self, folder_name, format = "tgz"):
         pid = psutil.Process(os.getpid())
-
+        print(format)
         pid.nice(19)
         self.logger.log("Starting compression of %s" % folder_name)
 
@@ -399,14 +425,17 @@ class Recorder:
         else:
             input_files = str(pathlib.Path(folder_name).absolute()) + '/*.jpg'
             output_file = '%s.mkv' % folder_name
+            print(input_files)
             call_args = ['ffmpeg', '-r', '25', '-pattern_type', 'glob', '-i',
                          input_files, '-vcodec', 'libx264',
                          '-crf', '22', '-y',
                          '-refs', '2', '-preset', 'veryfast', '-profile:v',
                          'main', '-threads', '4', '-hide_banner',
-                         '-loglevel', 'warning', output_file]
+                         output_file]
 
-        subprocess.run(call_args, stdout=subprocess.DEVNULL)
+        print(' '.join(call_args))
+
+        subprocess.run(call_args)
 
         self.logger.log("Compression of %s done" % folder_name, begin="\n")
 
@@ -558,7 +587,15 @@ class Recorder:
 
     def led_ON(self):
         GPIO.output(17, GPIO.HIGH)
+        self.LED_status = True
 
     def led_OFF(self):
         GPIO.output(17, GPIO.LOW)
+        self.LED_status = False
+
+    def led_pause(self, sleep_time, delay=0):
+        time.sleep(delay)
+        self.led_OFF()
+        time.sleep(sleep_time)
+        self.led_ON()
 
