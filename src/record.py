@@ -98,6 +98,11 @@ class Recorder:
 
         self.camera.start()
 
+        if not self.preview_only():
+            # If one does an actual recording and not just a preview (i.e. timeout=0)
+            # sync all raspberry pi by acquiring frames every even second
+            self.wait_until_next_even_second()
+
         self.initial_time = time.time()
 
         #self.create_output_folder()
@@ -263,7 +268,7 @@ class Recorder:
             scale = 1
             thickness = 2
 
-            string_time = (datetime.now()).strftime('%Y-%m-%d %H:%M:%S')
+            string_time = (datetime.now()).strftime('%Y-%m-%d %H:%M:%S.%f')
             string_to_overlay = "%s | %s | %s | %s" % (gethostname(), self.get_filename(), string_time, name)
 
             try:
@@ -528,3 +533,17 @@ class Recorder:
             pass
         return True
 
+    def preview_only(self):
+        if self.parameters["timeout"] == 0:
+            return True
+        return False
+
+    def wait_until_next_even_second(self):
+        # Get the current time
+        current_time = datetime.now()
+
+        # Calculate the number of milliseconds until the next even second
+        useconds_until_next_even_second = 1000000 - current_time.microsecond + ((current_time.second + 1) % 2) * 1000000
+
+        # Sleep until the next even second
+        time.sleep(useconds_until_next_even_second / 1000000)
