@@ -19,6 +19,7 @@ import psutil
 import pathlib
 
 from src.camera import Camera
+from src.led_controller import LED
 # from src.tlc5940.tlc import tlc5940
 import os
 import subprocess
@@ -68,6 +69,8 @@ class Recorder:
 
         self.git_version = git_version
 
+        self.leds = LED(_control_gpio_pin=17)
+
         #subprocess.run(['cpulimit', '-P', '/usr/bin/gzip', '-l', '10', '-b', '-q'])
 
         # TODO pool instead of single process
@@ -100,6 +103,11 @@ class Recorder:
 
         self.camera.start()
 
+        if not self.preview_only():
+            # If one does an actual recording and not just a preview (i.e. timeout=0)
+            # sync all raspberry pi by acquiring frames every even second
+            self.wait_until_next_even_second()
+
         self.initial_time = time.time()
 
         #self.create_output_folder()
@@ -117,6 +125,7 @@ class Recorder:
             self.wait_or_catchup_by_skipping_frames()
 
             self.start_time_current_frame = time.time()
+            self.leds.turn_on()
 
             try:
                 if not self.skip_frame:
@@ -128,6 +137,8 @@ class Recorder:
                     ##DEBUG
                     start_time = time.time()
 
+                    self.leds.turn_on()
+
                     ## That is the new method
                     capture_request = self.camera.capture_request()
                     capture_request.save("main", self.get_last_save_path())
@@ -138,6 +149,8 @@ class Recorder:
                     end_time = time.time()
                     execution_time = end_time - start_time
                     print("Execution time:", execution_time, "seconds")
+
+
 
                     avg_time = avg_time + execution_time
 
@@ -186,6 +199,8 @@ class Recorder:
                 self.logger.log("Error 2 on frame %d" % self.current_frame_number)
 
             finally:
+
+                self.leds.turn_off()
 
                 #TODO : write doc about why this check is useful
                 if self.get_last_save_path() is not None:
@@ -265,7 +280,7 @@ class Recorder:
             scale = 1
             thickness = 2
 
-            string_time = (datetime.now()).strftime('%Y-%m-%d %H:%M:%S')
+            string_time = (datetime.now()).strftime('%Y-%m-%d %H:%M:%S.%f')
             string_to_overlay = "%s | %s | %s | %s" % (gethostname(), self.get_filename(), string_time, name)
 
             try:
@@ -530,3 +545,17 @@ class Recorder:
             pass
         return True
 
+    def preview_only(self):
+        if self.parameters["timeout"] == 0:
+            return True
+        return False
+
+    def wait_until_next_even_second(self):
+        # Get the current time
+        current_time = datetime.now()
+
+        # Calculate the number of milliseconds until the next even second
+        useconds_until_next_even_second = 1000000 - current_time.microsecond + ((current_time.second + 1) % 2) * 1000000
+
+        # Sleep until the next even second
+        time.sleep(useconds_until_next_even_second / 1000000)
