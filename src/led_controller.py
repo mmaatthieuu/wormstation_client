@@ -9,6 +9,7 @@ class LED():
 
     def __init__(self, _control_gpio_pin):
 
+        GPIO.cleanup()
         self.gpio_pin = _control_gpio_pin
 
         GPIO.setmode(GPIO.BCM)  # set pin numbering mode to BCM
