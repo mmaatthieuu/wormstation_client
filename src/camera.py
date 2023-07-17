@@ -21,7 +21,7 @@ class Camera(Picamera2):
 
         super(Camera, self).__init__()
 
-        config = self.create_still_configuration()
+        config = self.create_still_configuration(buffer_count=1)
 
 
 

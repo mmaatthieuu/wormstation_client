@@ -65,7 +65,7 @@ class Recorder:
         self.delay = 0
         self.start_time_current_frame = 0
 
-        self.optogenetic = False
+        self.optogenetic = True
         self.LED_status = None
 
         if self.optogenetic:
@@ -78,10 +78,10 @@ class Recorder:
         exposure = self.parameters["shutter_speed"] / 1000
         # Coefficient computed with linear regression between minimal empirical values found for
         # exposure=10ms and exposure=100ms
-        self.pause_time = 0.001444 * exposure + 0.075555
-        self.delay_time = 0.001 * exposure + 0.08
-        if exposure == 50:
-            self.pause_time = 0.13
+        self.pause_time = 0.001444 * exposure + 0.075555 + 0.3
+        self.delay_time = 0.001 * exposure + 0.08 + 0.1
+        #if exposure == 50:
+        #    self.pause_time = 0.13
 
 
         self.git_version = git_version
@@ -162,6 +162,9 @@ class Recorder:
                     #pause_time = 0.12 #(50 ms)
                     #pause_time = 0.22
 
+                    #self.delay_time = 0
+                    self.pause_time = 0.5
+                    '''
                     if self.optogenetic:
                         if self.LED_status:
                             led_pause_process = multiprocessing.Process(target=self.led_pause, args=(self.pause_time,))
@@ -169,11 +172,15 @@ class Recorder:
 
                         # Delay is always applied to avoind incuding a time shift wether LED are ON or OFF
                         time.sleep(self.delay_time)
-
+                    '''
                     #print(f'delay = {delay_time}, pause_time = {pause_time}')
                     #time.sleep(0.13)
                     #time.sleep(0.18)
-
+                    self.led_OFF()
+                    self.led_OFF()
+                    self.led_OFF()
+                    time.sleep(0.15)
+                    '''
                     capture_request = self.camera.capture_request()
                     #print(f'After capture request {time.time() - start_time}')
 
@@ -183,6 +190,19 @@ class Recorder:
 
                     capture_request.release()
                     #print(f'After release {time.time() - start_time}')
+                    '''
+
+                    (buffer, ), metadata = self.camera.capture_buffers(["main"])
+                    #time.sleep(0.5)
+                    self.led_ON()
+                    self.led_ON()
+                    self.led_ON()
+                    #time.sleep(0.05)
+
+                    img = self.camera.helpers.make_image(buffer, self.camera.camera_configuration()["main"])
+                    self.camera.helpers.save(img, metadata, self.get_last_save_path())
+
+
 
                     ## DEBUG :
 
