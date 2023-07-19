@@ -144,7 +144,7 @@ class Recorder:
                     ##DEBUG
                     #start_time = time.time()
 
-                    self.leds.turn_on_with_timer_in_ms(self.parameters["shutter_speed"]/1000*2)
+                    self.leds.turn_on_with_timer_in_ms(self.parameters["shutter_speed"]/1000*4)
                     #self.do_optostimulation_if_necessary()
 
                     ## That is the new method, not crashing
