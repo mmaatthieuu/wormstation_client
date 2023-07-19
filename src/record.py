@@ -228,10 +228,10 @@ class Recorder:
                 self.create_symlink_to_last_frame()
 
         ## DEBUG
-        avg_time = avg_time / float(self.n_frames_total)
-
-        print("average time over " + str(self.n_frames_total) + " frames is " + str(avg_time) +
-              "\nMin : " + str(min_time) + "\nMax : " + str(max_time))
+        # avg_time = avg_time / float(self.n_frames_total)
+        #
+        # print("average time over " + str(self.n_frames_total) + " frames is " + str(avg_time) +
+        #       "\nMin : " + str(min_time) + "\nMax : " + str(max_time))
 
     def wait_or_catchup_by_skipping_frames(self):
         # Wait
