@@ -65,11 +65,15 @@ class Recorder:
         self.delay = 0
         self.start_time_current_frame = 0
 
-        self.optogenetic = True
+        self.optogenetic = self.parameters["optogenetic"]
+        self.pulse_duration = self.parameters["pulse_duration"]
+        self.pulse_interval = self.parameters["pulse_interval"]
 
         self.git_version = git_version
 
         self.leds = LED(_control_gpio_pin=17)
+        if self.optogenetic:
+            self.opto_leds = LED(_control_gpio_pin=18)
 
         #subprocess.run(['cpulimit', '-P', '/usr/bin/gzip', '-l', '10', '-b', '-q'])
 
@@ -110,6 +114,10 @@ class Recorder:
 
         self.initial_time = time.time()
 
+        if self.optogenetic:
+            self.opto_leds.start_program(time_on=self.pulse_duration, period=self.pulse_interval,
+                                         time_out=self.parameters["timeout"], initial_time=self.initial_time)
+
         #self.create_output_folder()
 
         avg_time = 0;
@@ -125,41 +133,43 @@ class Recorder:
             self.wait_or_catchup_by_skipping_frames()
 
             self.start_time_current_frame = time.time()
-            self.leds.turn_on()
 
             try:
                 if not self.skip_frame:
                     self.log_progress()
 
-                    ## That was randomly crashing so we used the next method
+                    ## That was randomly crashing so I used the next method
                     # self.camera.capture_file(self.get_last_save_path())
 
                     ##DEBUG
-                    start_time = time.time()
+                    #start_time = time.time()
 
-                    self.leds.turn_on()
+                    self.leds.turn_on_with_timer_in_ms(self.parameters["shutter_speed"]/1000*2)
+                    #self.do_optostimulation_if_necessary()
 
-                    ## That is the new method
+                    ## That is the new method, not crashing
                     capture_request = self.camera.capture_request()
                     capture_request.save("main", self.get_last_save_path())
                     # self.logger.log(capture_request.get_metadata(), log_level=2)
+                    #end_time = time.time()
+                    #self.leds.turn_off()
                     capture_request.release()
 
                     ## DEBUG :
-                    end_time = time.time()
-                    execution_time = end_time - start_time
-                    print("Execution time:", execution_time, "seconds")
+                    #end_time = time.time()
+                    #execution_time = end_time - start_time
+                    #print("Execution time:", execution_time, "seconds")
 
 
-
-                    avg_time = avg_time + execution_time
-
-                    if self.current_frame_number == 0:
-                        min_time = execution_time
-                        max_time = execution_time
-                    else:
-                        if execution_time<min_time:min_time=execution_time
-                        if execution_time>max_time:max_time=execution_time
+                    ## DEBUG
+                    # avg_time = avg_time + execution_time
+                    #
+                    # if self.current_frame_number == 0:
+                    #     min_time = execution_time
+                    #     max_time = execution_time
+                    # else:
+                    #     if execution_time<min_time:min_time=execution_time
+                    #     if execution_time>max_time:max_time=execution_time
 
                     ### From the documentation :
                     '''
@@ -199,8 +209,6 @@ class Recorder:
                 self.logger.log("Error 2 on frame %d" % self.current_frame_number)
 
             finally:
-
-                self.leds.turn_off()
 
                 #TODO : write doc about why this check is useful
                 if self.get_last_save_path() is not None:
@@ -551,11 +559,34 @@ class Recorder:
         return False
 
     def wait_until_next_even_second(self):
+        # Actually it is not the next even second but the next second multiple of 4.
+        # It increases the chances that all the device start simultaneously and are not splitted
+
         # Get the current time
         current_time = datetime.now()
 
-        # Calculate the number of milliseconds until the next even second
-        useconds_until_next_even_second = 1000000 - current_time.microsecond + ((current_time.second + 1) % 2) * 1000000
+        # Calculate the number of milliseconds until the next second multiple of 4
+        useconds_until_next_even_second = 1000000 - current_time.microsecond + ((current_time.second + 1) % 4) * 1000000
 
         # Sleep until the next even second
         time.sleep(useconds_until_next_even_second / 1000000)
+"""
+    def is_it_time_for_opto_simulation(self):
+        current_time = time.time()
+        time_from_start = int(current_time - self.initial_time)
+
+        if self.optogenetic == False:
+            return False
+
+        if (time_from_start % self.pulse_interval) <= (time_from_start % self.pulse_duration):
+            return True
+        else:
+            return False
+
+    def do_optostimulation_if_necessary(self):
+        print(self.is_it_time_for_opto_simulation())
+        if self.is_it_time_for_opto_simulation():
+            self.opto_leds.turn_on()
+        else:
+            self.opto_leds.turn_off()
+"""
