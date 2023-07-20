@@ -35,8 +35,10 @@ class LED():
         p.start()
 
     def _turn_on_with_timer(self, duration):
+        print("ON led")
         self.turn_on()
         time.sleep(duration/1000)
+        print("OFF led")
         self.turn_off()
 
     def get_is_ON(self):

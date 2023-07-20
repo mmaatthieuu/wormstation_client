@@ -144,16 +144,14 @@ class Recorder:
                     ##DEBUG
                     #start_time = time.time()
 
-                    self.leds.turn_on_with_timer_in_ms(self.parameters["shutter_speed"]/1000*4)
+                    self.leds.turn_on_with_timer_in_ms(self.parameters["shutter_speed"]/1000*15)
+                    #self.leds.turn_on()
                     #self.do_optostimulation_if_necessary()
+                    time.sleep(0.3)
 
-                    ## That is the new method, not crashing
-                    capture_request = self.camera.capture_request()
-                    capture_request.save("main", self.get_last_save_path())
-                    # self.logger.log(capture_request.get_metadata(), log_level=2)
-                    #end_time = time.time()
+                    self.capture_frame()
+
                     #self.leds.turn_off()
-                    capture_request.release()
 
                     ## DEBUG :
                     #end_time = time.time()
@@ -232,6 +230,20 @@ class Recorder:
         #
         # print("average time over " + str(self.n_frames_total) + " frames is " + str(avg_time) +
         #       "\nMin : " + str(min_time) + "\nMax : " + str(max_time))
+
+    def capture_frame(self):
+        ## That is the new method, not crashing
+
+        print("start capture")
+        capture_request = self.camera.capture_request()
+        print("middle of capture")
+        capture_request.save("main", self.get_last_save_path())
+        print("end capture")
+        # self.logger.log(capture_request.get_metadata(), log_level=2)
+        # end_time = time.time()
+        # self.leds.turn_off()
+        capture_request.release()
+        print("released")
 
     def wait_or_catchup_by_skipping_frames(self):
         # Wait
