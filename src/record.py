@@ -120,11 +120,12 @@ class Recorder:
 
         #self.create_output_folder()
 
-        avg_time = 0;
+        avg_time = 0
 
         # Main recording loop
         for self.current_frame_number in range(self.parameters["start_frame"], self.n_frames_total):
             self.skip_frame = False
+
 
             # (Re)Initialize the current frame
             #self.current_frame = np.empty((3040, 4056, 3), dtype=np.uint8)
@@ -132,11 +133,13 @@ class Recorder:
             # If in advance, wait, otherwise skip frames
             self.wait_or_catchup_by_skipping_frames()
 
+
             self.start_time_current_frame = time.time()
 
             try:
                 if not self.skip_frame:
                     self.log_progress()
+
 
                     ## That was randomly crashing so I used the next method
                     # self.camera.capture_file(self.get_last_save_path())
@@ -144,12 +147,15 @@ class Recorder:
                     ##DEBUG
                     #start_time = time.time()
 
-                    self.leds.turn_on_with_timer_in_ms(self.parameters["shutter_speed"]/1000*15)
+
+                    self.leds.turn_on_with_timer_in_ms(self.parameters["shutter_speed"]/1000*1)
                     #self.leds.turn_on()
                     #self.do_optostimulation_if_necessary()
-                    time.sleep(0.3)
+                    #time.sleep(0.3)
+
 
                     self.capture_frame()
+
 
                     #self.leds.turn_off()
 
@@ -234,16 +240,12 @@ class Recorder:
     def capture_frame(self):
         ## That is the new method, not crashing
 
-        print("start capture")
         capture_request = self.camera.capture_request()
-        print("middle of capture")
         capture_request.save("main", self.get_last_save_path())
-        print("end capture")
         # self.logger.log(capture_request.get_metadata(), log_level=2)
         # end_time = time.time()
         # self.leds.turn_off()
         capture_request.release()
-        print("released")
 
     def wait_or_catchup_by_skipping_frames(self):
         # Wait
@@ -253,7 +255,7 @@ class Recorder:
                      self.parameters["start_frame"] * self.parameters["time_interval"]
 
         # If too early, wait until it is time to record
-        print(self.delay)
+        # print(self.delay)
         if self.delay < 0:
             try:
                 time.sleep(-self.delay)
@@ -375,6 +377,7 @@ class Recorder:
 
                     if n_trials > 5:
                         raise TimeoutError("Uplaod failed")
+
 
                 subprocess.run(['rm', '-rf', '%s' % folder_name])
                 subprocess.run(['rm', '-rf', '%s.%s' % (folder_name, format)])
