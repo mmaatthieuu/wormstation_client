@@ -148,7 +148,7 @@ class Recorder:
                     #start_time = time.time()
 
 
-                    self.leds.turn_on_with_timer_in_ms(self.parameters["shutter_speed"]/1000*2)
+                    self.leds.turn_on_with_timer_in_ms(self.parameters["shutter_speed"]/1000*3)
                     #self.leds.turn_on()
                     #self.do_optostimulation_if_necessary()
                     #time.sleep(0.3)
