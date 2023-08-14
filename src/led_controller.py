@@ -30,15 +30,21 @@ class LED():
         GPIO.output(self.gpio_pin, GPIO.LOW)
         self.is_on = False
 
-    def turn_on_with_timer_in_ms(self,duration):
-        p = multiprocessing.Process(target=self._turn_on_with_timer, args=(duration,))
-        p.start()
+    def turn_on_with_timer_in_ms(self, duration): #initial_time argument for debug purpose only
+
+        #p = multiprocessing.Process(target=self._turn_on_with_timer, args=(duration, initial_time,))
+
+        # Weirdly enough it works like that... even if LEDs are supposed to be off when the recording starts.
+        # With parallel process it works for preview but not recording (that is also weird).
+        #   The images are dark because the pictures happen to be taken before LED go on (only in record mode...)
+        # Maybe working due  to hardware latency with GPIO ???
+
+        self._turn_on_with_timer(duration)
+        #p.start()
 
     def _turn_on_with_timer(self, duration):
-        print("ON led")
         self.turn_on()
         time.sleep(duration/1000)
-        print("OFF led")
         self.turn_off()
 
     def get_is_ON(self):
