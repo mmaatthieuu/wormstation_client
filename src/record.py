@@ -114,7 +114,7 @@ class Recorder:
 
         self.initial_time = time.time()
 
-        if self.optogenetic and not self.preview_only():
+        if self.optogenetic:
             self.opto_leds.start_program(time_on=self.pulse_duration, period=self.pulse_interval,
                                          time_out=self.parameters["timeout"], initial_time=self.initial_time)
 
@@ -147,7 +147,7 @@ class Recorder:
                     self.leds.turn_on_with_timer_in_ms(self.parameters["illumination_pulse"])
                     #self.leds.turn_on()
                     #self.do_optostimulation_if_necessary()
-                    time.sleep(0.3)
+                    #time.sleep(0.3)
 
                     self.capture_frame()
 
