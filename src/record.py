@@ -147,7 +147,7 @@ class Recorder:
                     self.leds.turn_on_with_timer_in_ms(self.parameters["illumination_pulse"])
                     #self.leds.turn_on()
                     #self.do_optostimulation_if_necessary()
-                    time.sleep(0.02)
+                    time.sleep(0.1)
 
                     self.capture_frame()
 
