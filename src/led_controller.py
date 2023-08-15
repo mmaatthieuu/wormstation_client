@@ -2,6 +2,7 @@ import RPi.GPIO as GPIO
 import time
 from datetime import datetime
 import multiprocessing
+from threading import Thread
 
 
 
@@ -32,7 +33,9 @@ class LED():
 
     def turn_on_with_timer_in_ms(self, duration): #initial_time argument for debug purpose only
 
-        #p = multiprocessing.Process(target=self._turn_on_with_timer, args=(duration, initial_time,))
+        #p = multiprocessing.Process(target=self._turn_on_with_timer, args=(duration,))
+        #p = Thread(target=self._turn_on_with_timer, args=(duration,))
+
 
         # Weirdly enough it works like that... even if LEDs are supposed to be off when the recording starts.
         # With parallel process it works for preview but not recording (that is also weird).
@@ -43,6 +46,7 @@ class LED():
         #p.start()
 
     def _turn_on_with_timer(self, duration):
+        #time.sleep(0.5)
         self.turn_on()
         time.sleep(duration/1000)
         self.turn_off()
