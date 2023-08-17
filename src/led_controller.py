@@ -3,6 +3,7 @@ import time
 from datetime import datetime
 import multiprocessing
 from threading import Thread
+from .utils import get_remaining_time_to_next_seconds
 
 
 
@@ -45,20 +46,36 @@ class LED():
         self._turn_on_with_timer(duration)
         #p.start()
 
-    def _turn_on_with_timer(self, duration):
+    def _turn_on_with_timer(self, duration_in_ms):
         #time.sleep(0.5)
         self.turn_on()
-        time.sleep(duration/1000)
+        time.sleep(duration_in_ms / 1000)
         self.turn_off()
 
     def get_is_ON(self):
         return self.is_on
 
-    def start_program(self, time_on, period, time_out, offset=0, initial_time=None):
+    def start_program_in_sec(self, time_on, period, time_out, offset=0, initial_time=None):
         p = multiprocessing.Process(target=self._program, args=(time_on, period, time_out, offset, initial_time,))
         p.start()
 
+    def start_time_based_program_in_sec(self, time_on, period, time_out, initial_time=None):
+        p = multiprocessing.Process(target=self._time_based_program, args=(time_on, period, time_out,))
+        p.start()
+
+    def _time_based_program(self, time_on, period, time_out):
+        initial_time = time.time()
+
+        while (time.time() - initial_time) <= time_out:
+            current_time = time.time()
+            self._turn_on_with_timer(time_on)
+            time.sleep(get_remaining_time_to_next_seconds(current_time, period))
+
+        print("exit program")
+
+
     def _program(self, time_on, period, time_out, offset, initial_time):
+        print(f'time on = {time_on}, period = {period}')
         if initial_time is None:
             initial_time = time.time()
         print("initial wait")
