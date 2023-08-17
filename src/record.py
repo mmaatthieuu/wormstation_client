@@ -4,6 +4,8 @@ from datetime import datetime
 from socket import gethostname
 from PIL import Image as im
 
+from .utils import *
+
 
 # import picamera
 import json
@@ -110,13 +112,21 @@ class Recorder:
         if not self.preview_only():
             # If one does an actual recording and not just a preview (i.e. timeout=0)
             # sync all raspberry pi by acquiring frames every even second
-            self.wait_until_next_even_second()
+            wait_until_next_even_second()
+
+            self.leds.start_time_based_program_in_sec(self.parameters["illumination_pulse"]/1000,
+                                                      period=self.parameters["time_interval"],
+                                                      time_out=self.parameters["timeout"])
 
         self.initial_time = time.time()
 
         if self.optogenetic:
-            self.opto_leds.start_program(time_on=self.pulse_duration, period=self.pulse_interval,
-                                         time_out=self.parameters["timeout"], initial_time=self.initial_time)
+            self.opto_leds.start_program_in_sec(time_on=self.pulse_duration, period=self.pulse_interval,
+                                                time_out=self.parameters["timeout"], initial_time=self.initial_time)
+
+        # self.leds.start_program_in_sec(time_on=self.parameters["illumination_pulse"]/1000,
+        #                                period=self.parameters["time_interval"], time_out=self.parameters["timeout"],
+        #                                initial_time=self.initial_time)
 
         #self.create_output_folder()
 
@@ -144,7 +154,7 @@ class Recorder:
                     ##DEBUG
                     #start_time = time.time()
 
-                    self.leds.turn_on_with_timer_in_ms(self.parameters["illumination_pulse"])
+                    #self.leds.turn_on_with_timer_in_ms(self.parameters["illumination_pulse"])
                     #self.leds.turn_on()
                     #self.do_optostimulation_if_necessary()
                     #time.sleep(0.3)
@@ -234,16 +244,16 @@ class Recorder:
     def capture_frame(self):
         ## That is the new method, not crashing
 
-        print("start capture")
+        #print("start capture")
         capture_request = self.camera.capture_request()
-        print("middle of capture")
+        #print("middle of capture")
         capture_request.save("main", self.get_last_save_path())
-        print("end capture")
+        #print("end capture")
         # self.logger.log(capture_request.get_metadata(), log_level=2)
         # end_time = time.time()
         # self.leds.turn_off()
         capture_request.release()
-        print("released")
+        #print("released")
 
     def wait_or_catchup_by_skipping_frames(self):
         # Wait
@@ -570,18 +580,7 @@ class Recorder:
             return True
         return False
 
-    def wait_until_next_even_second(self):
-        # Actually it is not the next even second but the next second multiple of 4.
-        # It increases the chances that all the device start simultaneously and are not splitted
 
-        # Get the current time
-        current_time = datetime.now()
-
-        # Calculate the number of milliseconds until the next second multiple of 4
-        useconds_until_next_even_second = 1000000 - current_time.microsecond + ((current_time.second + 1) % 4) * 1000000
-
-        # Sleep until the next even second
-        time.sleep(useconds_until_next_even_second / 1000000)
 """
     def is_it_time_for_opto_simulation(self):
         current_time = time.time()
