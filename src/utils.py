@@ -45,10 +45,10 @@ def get_remaining_time_to_next_seconds(time_of_previous_event, n_seconds):
     next_datetime = current_datetime.replace(second=previous_second,microsecond=0) + timedelta(seconds=n_seconds)
     print(f'next time : {next_datetime.strftime("%Y-%m-%d %H:%M:%S.%f")}')
 
-    usecond_until_next_seconds = next_datetime - datetime.now()
+    second_until_next_seconds = (next_datetime - datetime.now()).total_seconds()
 
-    print(f'diff : {usecond_until_next_seconds}')
+    print(f'diff : {second_until_next_seconds}')
 
-    print(usecond_until_next_seconds)
+    print(f'in function : {second_until_next_seconds}')
 
-    return usecond_until_next_seconds, next_datetime
+    return second_until_next_seconds, next_datetime

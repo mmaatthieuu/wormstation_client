@@ -48,8 +48,11 @@ class LED():
 
     def _turn_on_with_timer(self, duration_in_ms):
         #time.sleep(0.5)
+        print("led on")
+        print(duration_in_ms)
         self.turn_on()
         time.sleep(duration_in_ms / 1000)
+        print("led Off")
         self.turn_off()
 
     def get_is_ON(self):
@@ -68,8 +71,12 @@ class LED():
 
         while (time.time() - initial_time) <= time_out:
             current_time = time.time()
+            print(current_time)
             self._turn_on_with_timer(time_on)
-            time.sleep(get_remaining_time_to_next_seconds(current_time, period))
+            remaining_time, next_datetime = get_remaining_time_to_next_seconds(current_time, period)
+            print(f'current time in while loop : {time.time()}')
+            print(f'remaining time in while loop before next event : {remaining_time}')
+            time.sleep(remaining_time)
 
         print("exit program")
 
