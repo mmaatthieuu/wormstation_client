@@ -475,7 +475,9 @@ class Recorder:
 
     def create_symlink_to_last_frame(self):
         # TODO : check if really necessary and remove or adapt
-        subprocess.run(['ln', '-sf', '%s' % pathlib.Path(self.get_last_save_path()).absolute(), '/home/matthieu/tmp/last_frame.jpg'])
+        tmp_dir = '/home/matthieu/tmp'
+        os.makedirs(tmp_dir, exist_ok=True)  # Create the directory if it doesn't exist
+        subprocess.run(['ln', '-sf', '%s' % pathlib.Path(self.get_last_save_path()).absolute(), f'{tmp_dir}/last_frame.jpg'])
 
 ### Other utility functions
 
