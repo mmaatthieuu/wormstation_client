@@ -94,7 +94,7 @@ class Recorder:
         # TODO : add git number to json file and maybe add check if git version is the same as current one ?
         # TODO : confirm parameters & check if folder already exists
         # TODO : check if samba config is working
-        # TODO : clean tmp local dir
+        # TODO : check if tmp local dir is empty, send a warning if it is not, then clean tmp local dir
 
         # Go to home directory
         self.go_to_tmp_recording_folder()

@@ -64,6 +64,24 @@ else
     echo "Python 3 installation found."
 fi
 
+# Check if smbclient is installed
+if ! command -v smbclient &> /dev/null; then
+    echo "smbclient is not installed. Installing smbclient using apt..."
+
+    if [ "$yes_flag" = true ]; then
+        sudo apt update
+        sudo apt install smbclient -y
+    else
+        read -p "Do you want to install smbclient? (y/n): " install_smbclient
+        if [ "$install_smbclient" = "y" ]; then
+            sudo apt update
+            sudo apt install smbclient
+        fi
+    fi
+else
+    echo "smbclient installation found."
+fi
+
 script_path=$(pwd)/cam.py
 
 # Try creating the symbolic link using sudo
@@ -110,4 +128,49 @@ else
     echo "OpenCV installation found."
 fi
 
+# Check if /etc/.smbpicreds exists
+if [ ! -f /etc/.smbpicreds ]; then
+    echo "No credential file for smbclient was found (/etc/.smbpicreds)."
+    read -p "Do you want to:
+    1. Locate an existing credential file
+    2. Generate /etc/.smbpicreds
+    3. Ignore (Videos will be stored locally)
+Enter your choice (1/2/3): " smbcred_choice
+
+    case "$smbcred_choice" in
+        1)
+            read -p "Enter the full path to the existing credential file: " existing_cred_file
+            if [ -f "$existing_cred_file" ]; then
+                sudo cp "$existing_cred_file" /etc/.smbpicreds
+                sudo chmod 600 /etc/.smbpicreds
+                sudo chown $USER:$USER /etc/.smbpicreds
+                echo "Credential file copied to /etc/.smbpicreds with read and write access for current user."
+            else
+                echo "File not found."
+            fi
+            ;;
+        2)
+            echo
+            echo "NOTE: It is recommended to have a dedicated NAS user with limited rights"
+            echo "    to be created for that purpose as credentials will be store as plain text"
+            echo
+            read -p "Enter NAS username: " smb_username
+            read -s -p "Enter NAS password: " smb_password
+            echo
+            sudo sh -c "echo 'username=$smb_username\npassword=$smb_password\ndomain=' > /etc/.smbpicreds"
+            sudo chmod 600 /etc/.smbpicreds
+            sudo chown $USER:$USER /etc/.smbpicreds
+            echo "Credential file /etc/.smbpicreds created with read and write access for current user."
+            ;;
+        3)
+            echo "Ignoring. Videos will be stored locally."
+            ;;
+        *)
+            echo "Invalid choice."
+            ;;
+    esac
+fi
+
+
+echo Installation done.
 
