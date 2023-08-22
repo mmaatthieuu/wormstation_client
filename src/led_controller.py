@@ -33,7 +33,7 @@ class LED():
 
     def turn_on_with_timer_in_ms(self, duration): #initial_time argument for debug purpose only
 
-        #p = multiprocessing.Process(target=self._turn_on_with_timer, args=(duration,))
+        p = multiprocessing.Process(target=self._turn_on_with_timer, args=(duration,))
         #p = Thread(target=self._turn_on_with_timer, args=(duration,))
 
 
@@ -42,8 +42,8 @@ class LED():
         #   The images are dark because the pictures happen to be taken before LED go on (only in record mode...)
         # Maybe working due  to hardware latency with GPIO ???
 
-        self._turn_on_with_timer(duration)
-        #p.start()
+        #self._turn_on_with_timer(duration)
+        p.start()
 
     def _turn_on_with_timer(self, duration):
         #time.sleep(0.5)

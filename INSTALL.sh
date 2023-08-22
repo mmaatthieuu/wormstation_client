@@ -171,6 +171,12 @@ Enter your choice (1/2/3): " smbcred_choice
     esac
 fi
 
+# Modify /etc/dphys-swapfile
+echo "Extending swap size to 2GB..."
+# It should be 3GB but in practice it is limited to 2GB
+sudo sed -i 's/^CONF_SWAPSIZE=.*/CONF_SWAPSIZE=3072/' /etc/dphys-swapfile
 
-echo Installation done.
+echo
+echo
+echo "Installation done. Please reboot to apply all the changes."
 
