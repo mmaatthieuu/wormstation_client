@@ -1,8 +1,10 @@
 import numpy as np
 import time
-from datetime import datetime
+import datetime
 from socket import gethostname
 from PIL import Image as im
+
+from .utils import *
 
 
 # import picamera
@@ -61,8 +63,8 @@ class Recorder:
 
         self.output_filename = self.read_output_filename()
 
-        self.initial_time = 0
-        self.delay = 0
+        self.initial_time = 0 # will be redefined at the beginning of recording
+        #self.delay = 0
         self.start_time_current_frame = 0
 
         self.optogenetic = self.parameters["optogenetic"]
@@ -94,7 +96,7 @@ class Recorder:
         # TODO : add git number to json file and maybe add check if git version is the same as current one ?
         # TODO : confirm parameters & check if folder already exists
         # TODO : check if samba config is working
-        # TODO : check if tmp local dir is empty, send a warning if it is not, then clean tmp local dir
+        # TODO : clean tmp local dir
 
         # Go to home directory
         self.go_to_tmp_recording_folder()
@@ -110,17 +112,28 @@ class Recorder:
         if not self.preview_only():
             # If one does an actual recording and not just a preview (i.e. timeout=0)
             # sync all raspberry pi by acquiring frames every even second
-            self.wait_until_next_even_second()
+
+
+            # self.leds.start_program_in_seconds(duration_of_illumination=self.parameters["illumination_pulse"]/1000,
+            #                                    period=self.parameters["time_interval"],
+            #                                    timeout=self.parameters["timeout"])
+
+            self.leds.run_led_timer(duration=self.parameters["illumination_pulse"]/1000,
+                                    period=self.parameters["time_interval"],
+                                    timeout=self.parameters["timeout"])
+
+            # wait_time, _ = get_remaining_time_to_next_seconds(time.time(),4)
+            # time.sleep(wait_time)
+            wait_until_next_even_second()
 
         self.initial_time = time.time()
 
         if self.optogenetic:
-            self.opto_leds.start_program(time_on=self.pulse_duration, period=self.pulse_interval,
-                                         time_out=self.parameters["timeout"], initial_time=self.initial_time)
+            self.leds.run_led_timer(duration=self.parameters["pulse_duration"],
+                                    period=self.parameters["pulse_interval"],
+                                    timeout=self.parameters["timeout"])
 
         #self.create_output_folder()
-
-        avg_time = 0;
 
         # Main recording loop
         for self.current_frame_number in range(self.parameters["start_frame"], self.n_frames_total):
@@ -133,6 +146,7 @@ class Recorder:
             self.wait_or_catchup_by_skipping_frames()
 
             self.start_time_current_frame = time.time()
+            # print(f'frame {self.current_frame_number} start: {self.start_time_current_frame - self.initial_time}')
 
             try:
                 if not self.skip_frame:
@@ -141,33 +155,8 @@ class Recorder:
                     ## That was randomly crashing so I used the next method
                     # self.camera.capture_file(self.get_last_save_path())
 
-                    ##DEBUG
-                    #start_time = time.time()
-
-                    self.leds.turn_on_with_timer_in_ms(self.parameters["illumination_pulse"])
-                    #self.leds.turn_on()
-                    #self.do_optostimulation_if_necessary()
-                    #time.sleep(0.3)
-
                     self.capture_frame()
 
-                    #self.leds.turn_off()
-
-                    ## DEBUG :
-                    #end_time = time.time()
-                    #execution_time = end_time - start_time
-                    #print("Execution time:", execution_time, "seconds")
-
-
-                    ## DEBUG
-                    # avg_time = avg_time + execution_time
-                    #
-                    # if self.current_frame_number == 0:
-                    #     min_time = execution_time
-                    #     max_time = execution_time
-                    # else:
-                    #     if execution_time<min_time:min_time=execution_time
-                    #     if execution_time>max_time:max_time=execution_time
 
                     ### From the documentation :
                     '''
@@ -225,6 +214,8 @@ class Recorder:
                 #create link to last frame
                 self.create_symlink_to_last_frame()
 
+                # print(f'end: {datetime.now() - self.initial_datetime}')
+
         ## DEBUG
         # avg_time = avg_time / float(self.n_frames_total)
         #
@@ -232,49 +223,43 @@ class Recorder:
         #       "\nMin : " + str(min_time) + "\nMax : " + str(max_time))
 
     def capture_frame(self):
-        ## That is the new method, not crashing
-
-        print("start capture")
+        # That is the new method, not crashing
         capture_request = self.camera.capture_request()
-        print("middle of capture")
         capture_request.save("main", self.get_last_save_path())
-        print("end capture")
-        # self.logger.log(capture_request.get_metadata(), log_level=2)
-        # end_time = time.time()
-        # self.leds.turn_off()
         capture_request.release()
-        print("released")
 
     def wait_or_catchup_by_skipping_frames(self):
         # Wait
         # Check if the current frame is on time
-        self.delay = time.time() - (self.initial_time +
+
+        delay = time.time() - (self.initial_time +
                                     self.current_frame_number * self.parameters["time_interval"]) + \
                      self.parameters["start_frame"] * self.parameters["time_interval"]
 
         # If too early, wait until it is time to record
-        print(self.delay)
-        if self.delay < 0:
+        #print(delay)
+        # print(f'current: {current_timedelta}, exp: {expected_timedelta_for_current_frame}, delay: {delay}')
+        if delay < 0:
             try:
-                time.sleep(-self.delay)
+                time.sleep(-delay)
             except BlockingIOError:
                 self.logger.log("\n\n it failed but still trying")
-                time.sleep(-self.delay)
+                time.sleep(-delay)
             if self.parameters["verbosity_level"] >= 2:
-                self.logger.log("Waiting for %fs" % -self.delay)
-        elif self.delay < 0.01:  # We need some tolerance in this world...
+                self.logger.log("Waiting for %fs" % -delay)
+        elif delay < 0.005:  # We need some tolerance in this world...
             pass # And go on directly with frame capture
         else:
             # Frame late : log delay
             if self.parameters["verbosity_level"] >= 1:
                 # log('Frame %fs late' % -diff_time, begin="\n")
-                self.logger.log('Delay : %fs' % self.delay)
+                self.logger.log('Delay : %fs' % delay)
 
         # Catch up
         # It the frame has more than one time interval of delay, it just skips the frame and directly
         # goes to the next one
         # The condition on current_frame_number is useful if one just wants one frame and does not care about time sync
-        if self.delay >= self.parameters["time_interval"] and \
+        if delay >= self.parameters["time_interval"] and \
                 self.current_frame_number < (self.n_frames_total - 1):
             self.skip_frame = True
             self.logger.log(f"Delay too long : Frame {self.current_frame_number} skipped", begin="\n    WARNING    ")
@@ -310,6 +295,7 @@ class Recorder:
                 # In case the function is called for a black frame, so the request is actually a np.array and
                 # not a picam2 request
                 return cv2.putText(request, string_to_overlay, origin, font, scale, colour, thickness)
+
 
 
     def save_frame(self):
@@ -376,7 +362,7 @@ class Recorder:
                     if n_trials > 5:
                         raise TimeoutError("Uplaod failed")
 
-                subprocess.run(['rm', '-rf', '%s' % folder_name])
+                # subprocess.run(['rm', '-rf', '%s' % folder_name])
                 subprocess.run(['rm', '-rf', '%s.%s' % (folder_name, format)])
             except TimeoutError as e:
                 self.logger.log(e)
@@ -475,9 +461,7 @@ class Recorder:
 
     def create_symlink_to_last_frame(self):
         # TODO : check if really necessary and remove or adapt
-        tmp_dir = '/home/matthieu/tmp'
-        os.makedirs(tmp_dir, exist_ok=True)  # Create the directory if it doesn't exist
-        subprocess.run(['ln', '-sf', '%s' % pathlib.Path(self.get_last_save_path()).absolute(), f'{tmp_dir}/last_frame.jpg'])
+        subprocess.run(['ln', '-sf', '%s' % pathlib.Path(self.get_last_save_path()).absolute(), '/home/matthieu/tmp/last_frame.jpg'])
 
 ### Other utility functions
 
@@ -572,18 +556,7 @@ class Recorder:
             return True
         return False
 
-    def wait_until_next_even_second(self):
-        # Actually it is not the next even second but the next second multiple of 4.
-        # It increases the chances that all the device start simultaneously and are not splitted
 
-        # Get the current time
-        current_time = datetime.now()
-
-        # Calculate the number of milliseconds until the next second multiple of 4
-        useconds_until_next_even_second = 1000000 - current_time.microsecond + ((current_time.second + 1) % 4) * 1000000
-
-        # Sleep until the next even second
-        time.sleep(useconds_until_next_even_second / 1000000)
 """
     def is_it_time_for_opto_simulation(self):
         current_time = time.time()
