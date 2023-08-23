@@ -1,28 +1,31 @@
 import RPi.GPIO as GPIO
 import time
-from datetime import datetime
 import multiprocessing
-from threading import Thread
-from .utils import get_remaining_time_to_next_seconds
-
-
+import atexit
 
 class LED():
-
     def __init__(self, _control_gpio_pin):
-
-        #GPIO.cleanup()
         GPIO.setwarnings(False)
         self.gpio_pin = _control_gpio_pin
         self.is_on = None
 
-        GPIO.setmode(GPIO.BCM)  # set pin numbering mode to BCM
-        GPIO.setup(self.gpio_pin, GPIO.OUT)  # set GPIO pin control_gpio_pin as an output
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setup(self.gpio_pin, GPIO.OUT)
+
+        self.program = None
 
         self.turn_off()
 
+        # Register a cleanup function to stop the LED timer process on exit
+        atexit.register(self.cleanup)
+
     def __del__(self):
-        GPIO.cleanup()
+        self.cleanup()
+
+    def cleanup(self):
+        if self.program and self.program.is_alive():
+            self.program.terminate()
+            self.program.join()
 
     def turn_on(self):
         GPIO.output(self.gpio_pin, GPIO.HIGH)
@@ -32,91 +35,26 @@ class LED():
         GPIO.output(self.gpio_pin, GPIO.LOW)
         self.is_on = False
 
-    def turn_on_with_timer_in_ms(self, duration): #initial_time argument for debug purpose only
+    def run_led_timer(self, duration, period, timeout):
+        print("enter run_led_timer")
+        timeout = timeout + (period * 2)
+        def led_timer_process():
+            print("led_timer_process")
+            # led_control = LED(self.gpio_pin)
+            end_time = time.time() + timeout
 
-        #p = multiprocessing.Process(target=self._turn_on_with_timer, args=(duration,))
-        #p = Thread(target=self._turn_on_with_timer, args=(duration,))
+            while time.time() < end_time:
+                current_time = time.time()
+                print(f'current time: {current_time}')
+                print(f'current_time % period : {current_time % period}')
+                if (current_time + 0.2) % period < 0.01:
+                    self.turn_on()
+                    time.sleep(duration)
+                    self.turn_off()
 
+                remaining_time = period - ((time.time() + 0.2) % period)
+                print(f'remaining_time: {remaining_time}')
+                time.sleep(remaining_time)
 
-        # Weirdly enough it works like that... even if LEDs are supposed to be off when the recording starts.
-        # With parallel process it works for preview but not recording (that is also weird).
-        #   The images are dark because the pictures happen to be taken before LED go on (only in record mode...)
-        # Maybe working due  to hardware latency with GPIO ???
-
-        self._turn_on_with_timer(duration)
-        #p.start()
-
-    def _turn_on_with_timer(self, duration_in_ms):
-        #time.sleep(0.5)
-        print("led on")
-        print(duration_in_ms)
-        self.turn_on()
-        time.sleep(duration_in_ms / 1000)
-        print("led Off")
-        self.turn_off()
-
-    def get_is_ON(self):
-        return self.is_on
-
-    def start_program_in_sec(self, time_on, period, time_out, offset=0, initial_time=None):
-        p = multiprocessing.Process(target=self._program, args=(time_on, period, time_out, offset, initial_time,))
-        p.start()
-
-    def start_time_based_program_in_sec(self, time_on, period, time_out, initial_time=None):
-        p = multiprocessing.Process(target=self._time_based_program, args=(time_on, period, time_out,))
-        p.start()
-
-    def _time_based_program(self, time_on, period, time_out):
-        initial_time = time.time()
-
-        while (time.time() - initial_time) <= time_out:
-            current_time = time.time()
-            print(current_time)
-            self._turn_on_with_timer(time_on)
-            remaining_time, next_datetime = get_remaining_time_to_next_seconds(current_time, period)
-            print(f'current time in while loop : {time.time()}')
-            print(f'remaining time in while loop before next event : {remaining_time}')
-            time.sleep(remaining_time)
-
-        print("exit program")
-
-
-    def _program(self, time_on, period, time_out, offset, initial_time):
-        print(f'time on = {time_on}, period = {period}')
-        if initial_time is None:
-            initial_time = time.time()
-        print("initial wait")
-        time.sleep(offset)
-        while (time.time()-initial_time) <= time_out:
-            print(f'turn on for {time_on} s')
-            self.turn_on()
-            time.sleep(time_on)
-            print(f'turn off for {period-time_on} s')
-            self.turn_off()
-            time.sleep(period-time_on)
-        print("exit program")
-
-"""
-    def should_be_on(self):
-        if self.get_is_ON():
-            pass
-        else:
-            self.turn_on()
-
-    def should_be_off(self):
-        if self.get_is_ON():
-            self.turn_off()
-        else:
-            pass
-
-    def get_is_ON(self):
-        if GPIO.input(self.gpio_pin) == GPIO.HIGH:
-            return True
-        else:
-            return False
-
-    def get_is_OFF(self):
-        return not self.get_is_ON()
-"""
-
-
+        self.program = multiprocessing.Process(target=led_timer_process)
+        self.program.start()
