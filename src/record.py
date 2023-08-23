@@ -63,7 +63,7 @@ class Recorder:
 
         self.output_filename = self.read_output_filename()
 
-        self.initial_datetime = datetime.now() # will be redefined at the beginning of recording
+        self.initial_time = 0 # will be redefined at the beginning of recording
         #self.delay = 0
         self.start_time_current_frame = 0
 
@@ -126,7 +126,7 @@ class Recorder:
             # time.sleep(wait_time)
             wait_until_next_even_second()
 
-        self.initial_datetime = datetime.now()
+        self.initial_time = time.time()
 
         if self.optogenetic:
             self.leds.run_led_timer(duration=self.parameters["pulse_duration"],
@@ -145,8 +145,8 @@ class Recorder:
             # If in advance, wait, otherwise skip frames
             self.wait_or_catchup_by_skipping_frames()
 
-            self.start_time_current_frame = datetime.now()
-            print(f'frame {self.current_frame_number} start: {self.start_time_current_frame - self.initial_datetime}')
+            self.start_time_current_frame = time.time()
+            # print(f'frame {self.current_frame_number} start: {self.start_time_current_frame - self.initial_time}')
 
             try:
                 if not self.skip_frame:
@@ -231,16 +231,10 @@ class Recorder:
     def wait_or_catchup_by_skipping_frames(self):
         # Wait
         # Check if the current frame is on time
-        current_datetime = datetime.now()
-        current_timedelta = current_datetime - self.initial_datetime
-        expected_timedelta_for_current_frame = timedelta(seconds=self.current_frame_number * self.parameters["time_interval"])
 
-        delay = (current_timedelta - expected_timedelta_for_current_frame).total_seconds()
-
-        #TODO rewrite this using datetime and get_remaining_time
-        # self.delay = time.time() - (self.initial_time +
-        #                             self.current_frame_number * self.parameters["time_interval"]) + \
-        #              self.parameters["start_frame"] * self.parameters["time_interval"]
+        delay = time.time() - (self.initial_time +
+                                    self.current_frame_number * self.parameters["time_interval"]) + \
+                     self.parameters["start_frame"] * self.parameters["time_interval"]
 
         # If too early, wait until it is time to record
         #print(delay)
