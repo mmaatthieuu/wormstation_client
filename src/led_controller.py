@@ -36,24 +36,19 @@ class LED():
         self.is_on = False
 
     def run_led_timer(self, duration, period, timeout):
-        print("enter run_led_timer")
         timeout = timeout + (period * 2)
         def led_timer_process():
-            print("led_timer_process")
             # led_control = LED(self.gpio_pin)
             end_time = time.time() + timeout
 
             while time.time() < end_time:
                 current_time = time.time()
-                print(f'current time: {current_time}')
-                print(f'current_time % period : {current_time % period}')
                 if (current_time + 0.2) % period < 0.01:
                     self.turn_on()
                     time.sleep(duration)
                     self.turn_off()
 
                 remaining_time = period - ((time.time() + 0.2) % period)
-                print(f'remaining_time: {remaining_time}')
                 time.sleep(remaining_time)
 
         self.program = multiprocessing.Process(target=led_timer_process)
