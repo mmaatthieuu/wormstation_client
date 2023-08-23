@@ -105,7 +105,7 @@ class Recorder:
 
         self.logger.log(json.dumps(self.parameters, indent=4))
 
-        self.camera.post_callback = self.annotate_frame
+        self.camera.pre_callback = self.annotate_frame
 
         self.camera.start()
 
