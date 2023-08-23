@@ -362,7 +362,7 @@ class Recorder:
                     if n_trials > 5:
                         raise TimeoutError("Uplaod failed")
 
-                # subprocess.run(['rm', '-rf', '%s' % folder_name])
+                subprocess.run(['rm', '-rf', '%s' % folder_name])
                 subprocess.run(['rm', '-rf', '%s.%s' % (folder_name, format)])
             except TimeoutError as e:
                 self.logger.log(e)
