@@ -146,7 +146,7 @@ class Recorder:
             self.wait_or_catchup_by_skipping_frames()
 
             self.start_time_current_frame = time.time()
-            # print(f'frame {self.current_frame_number} start: {self.start_time_current_frame - self.initial_time}')
+            print(f'frame {self.current_frame_number} start: {self.start_time_current_frame - self.initial_time}')
 
             try:
                 if not self.skip_frame:
@@ -542,6 +542,10 @@ class Recorder:
             return "."
 
     def is_it_useful_to_save_logs(self):
+
+        #debug
+        return False
+
         if self.parameters["timeout"] == 0:
             return False
         try:

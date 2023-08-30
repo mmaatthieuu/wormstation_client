@@ -41,14 +41,17 @@ class LED():
             # led_control = LED(self.gpio_pin)
             end_time = time.time() + timeout
 
+            # LEDs are turned on <offset> seconds before pictures are taken
+            offset = 0.25
+
             while time.time() < end_time:
                 current_time = time.time()
-                if (current_time + 0.2) % period < 0.01:
+                if (current_time + offset) % period < 0.01:
                     self.turn_on()
                     time.sleep(duration)
                     self.turn_off()
 
-                remaining_time = period - ((time.time() + 0.2) % period)
+                remaining_time = period - ((time.time() + offset) % period)
                 time.sleep(remaining_time)
 
         self.program = multiprocessing.Process(target=led_timer_process)
