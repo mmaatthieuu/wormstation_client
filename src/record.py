@@ -542,10 +542,6 @@ class Recorder:
             return "."
 
     def is_it_useful_to_save_logs(self):
-
-        #debug
-        return False
-
         if self.parameters["timeout"] == 0:
             return False
         try:
