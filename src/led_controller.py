@@ -2,6 +2,7 @@ import RPi.GPIO as GPIO
 import time
 import multiprocessing
 import atexit
+import psutil
 
 class LED():
     def __init__(self, _control_gpio_pin):
@@ -38,6 +39,10 @@ class LED():
     def run_led_timer(self, duration, period, timeout):
         timeout = timeout + (period * 2)
         def led_timer_process():
+
+            # Set the process's CPU priority to a high value
+            psutil.Process().nice(-20)  # Adjust the nice value as needed
+
             # led_control = LED(self.gpio_pin)
             end_time = time.time() + timeout
 
