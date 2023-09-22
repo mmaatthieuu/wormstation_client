@@ -15,7 +15,7 @@ class LED():
 
         self.program = None
 
-        self.turn_off()
+        #self.turn_off()
 
         # Register a cleanup function to stop the LED timer process on exit
         atexit.register(self.cleanup)

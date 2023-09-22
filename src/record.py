@@ -206,6 +206,7 @@ class Recorder:
 
                     if self.is_time_for_compression():
                         self.logger.log("time for compression")
+                        self.logger.log("time for compression")
                         self.start_async_compression_and_upload(format="mkv")
 
                     if self.parameters["use_samba"] and self.is_it_useful_to_save_logs():
