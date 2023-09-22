@@ -348,7 +348,7 @@ class Recorder:
         self.compress_process.start()
 
     def compress_and_upload(self, folder_name, format):
-        self.logger.log("start compression")
+        #self.logger.log("start compression")
         compressed_file = self.compress(folder_name=folder_name, format=format)
         if self.parameters["use_samba"] is True:
             file_to_upload = compressed_file
@@ -357,12 +357,16 @@ class Recorder:
             n_trials = 0
             try:
                 while self.upload_failed(file_to_upload):
+                    self.logger.log("Uploading...")
                     ok = self.smbupload(file_to_upload=file_to_upload)
                     n_trials = n_trials+1
 
                     if n_trials > 5:
                         raise TimeoutError("Uplaod failed")
 
+                self.logger.log("Upload successful")
+                #TODO : Maybe add check on NAS to confirm sucessful upload
+                self.logger.log("Deleting local files")
                 subprocess.run(['rm', '-rf', '%s' % folder_name])
                 subprocess.run(['rm', '-rf', '%s.%s' % (folder_name, format)])
             except TimeoutError as e:
@@ -376,7 +380,7 @@ class Recorder:
                 #log("something went wrong wile uploading")
                 #raise Exception
 
-        self.logger.log("compression done")
+        #self.logger.log("compression done")
 
     def upload_failed(self, uploaded_file):
         out_str = self.smbcommand("ls").stdout.decode("utf-8")
