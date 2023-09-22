@@ -389,8 +389,8 @@ class Recorder:
 
     def compress(self, folder_name, format = "tgz"):
         pid = psutil.Process(os.getpid())
-
         pid.nice(19)
+
         self.logger.log("Starting compression of %s" % folder_name)
 
         if format == "tgz":
