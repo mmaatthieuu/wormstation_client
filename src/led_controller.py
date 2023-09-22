@@ -31,17 +31,19 @@ class LED():
     def turn_on(self):
         GPIO.output(self.gpio_pin, GPIO.HIGH)
         self.is_on = True
+        print(f'led should be on')
 
     def turn_off(self):
         GPIO.output(self.gpio_pin, GPIO.LOW)
         self.is_on = False
+        print('led should be off')
 
     def run_led_timer(self, duration, period, timeout):
         timeout = timeout + (period * 2)
         def led_timer_process():
 
             # Set the process's CPU priority to a high value
-            psutil.Process().nice(-20)  # Adjust the nice value as needed
+            psutil.Process().nice(20)  # Adjust the nice value as needed
 
             # led_control = LED(self.gpio_pin)
             end_time = time.time() + timeout
