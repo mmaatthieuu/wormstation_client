@@ -31,12 +31,10 @@ class LED():
     def turn_on(self):
         GPIO.output(self.gpio_pin, GPIO.HIGH)
         self.is_on = True
-        print(f'led should be on')
 
     def turn_off(self):
         GPIO.output(self.gpio_pin, GPIO.LOW)
         self.is_on = False
-        print('led should be off')
 
     def run_led_timer(self, duration, period, timeout):
         timeout = timeout + (period * 2)

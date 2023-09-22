@@ -146,7 +146,7 @@ class Recorder:
             self.wait_or_catchup_by_skipping_frames()
 
             self.start_time_current_frame = time.time()
-            print(f'frame {self.current_frame_number} start: {self.start_time_current_frame - self.initial_time}')
+            #print(f'frame {self.current_frame_number} start: {self.start_time_current_frame - self.initial_time}')
 
             try:
                 if not self.skip_frame:
@@ -333,7 +333,7 @@ class Recorder:
             else:
                 return False
         except TypeError as e:
-            print(e)
+            self.logger.log(e)
         except ZeroDivisionError as e:
             return False
 
@@ -348,7 +348,7 @@ class Recorder:
         self.compress_process.start()
 
     def compress_and_upload(self, folder_name, format):
-        print("start compression")
+        self.logger.log("start compression")
         compressed_file = self.compress(folder_name=folder_name, format=format)
         if self.parameters["use_samba"] is True:
             file_to_upload = compressed_file
@@ -376,7 +376,7 @@ class Recorder:
                 #log("something went wrong wile uploading")
                 #raise Exception
 
-        print("compression done")
+        self.logger.log("compression done")
 
     def upload_failed(self, uploaded_file):
         out_str = self.smbcommand("ls").stdout.decode("utf-8")
@@ -426,7 +426,7 @@ class Recorder:
                 try:
                     os.remove(file_to_upload)
                 except OSError as e:
-                    print("Error: %s - %s." % (e.filename, e.strerror))
+                    self.logger.log("Error: %s - %s." % (e.filename, e.strerror))
 
             return ok
         return True
@@ -457,7 +457,7 @@ class Recorder:
                  '-c', f'{command}'],
                 capture_output=True)
         except Exception as e:
-            print(e)
+            self.logger.log(e)
         return ok
 
     def create_symlink_to_last_frame(self):
