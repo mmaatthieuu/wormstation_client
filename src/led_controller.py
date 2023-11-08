@@ -37,27 +37,41 @@ class LED():
         self.is_on = False
 
     def run_led_timer(self, duration, period, timeout):
+        # Extend the timeout to ensure that the LED timer process runs until the end of the experiment
         timeout = timeout + (period * 2)
+
         def led_timer_process():
+            # This function defines a separate process for LED control
 
-            # Set the process's CPU priority to a high value
-            #psutil.Process().nice(20)  # Adjust the nice value as needed
-
-            # led_control = LED(self.gpio_pin)
+            # Calculate the end time of the LED timer process
             end_time = time.time() + timeout
 
-            # LEDs are turned on <offset> seconds before pictures are taken
+            # Define an offset to ensure that the LEDs are turned on just before pictures are taken
             offset = 0.25
 
             while time.time() < end_time:
+                # Check the current time
                 current_time = time.time()
-                if (current_time + offset) % period < 0.01:
-                    self.turn_on()
-                    time.sleep(duration)
-                    self.turn_off()
 
-                remaining_time = period - ((time.time() + offset) % period)
+                # Calculate the time until the next LED activation
+                time_until_next_activation = (current_time + offset) % period
+
+                # Calculate the remaining time until activation
+                remaining_time = period - time_until_next_activation
+
+                # Sleep to get closer to the activation time
                 time.sleep(remaining_time)
 
+                # Check the current time again
+                current_time = time.time()
+
+                # If it's time to turn on the LEDs (within 0.01 seconds before a multiple of the period)
+                if (current_time + offset) % period < 0.01:
+                    self.turn_on()  # Turn on the LEDs
+                    time.sleep(duration)  # Keep the LEDs on for the specified duration
+                    self.turn_off()  # Turn off the LEDs
+
+        # Create a new multiprocessing process that runs the LED control function
         self.program = multiprocessing.Process(target=led_timer_process)
         self.program.start()
+
