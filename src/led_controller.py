@@ -3,6 +3,7 @@ import time
 import multiprocessing
 import atexit
 import psutil
+from datetime import datetime
 
 class LED():
     def __init__(self, _control_gpio_pin):
@@ -62,14 +63,9 @@ class LED():
                 # Sleep to get closer to the activation time
                 time.sleep(remaining_time)
 
-                # Check the current time again
-                current_time = time.time()
-
-                # If it's time to turn on the LEDs (within 0.01 seconds before a multiple of the period)
-                if (current_time + offset) % period < 0.01:
-                    self.turn_on()  # Turn on the LEDs
-                    time.sleep(duration)  # Keep the LEDs on for the specified duration
-                    self.turn_off()  # Turn off the LEDs
+                self.turn_on()  # Turn on the LEDs
+                time.sleep(duration)  # Keep the LEDs on for the specified duration
+                self.turn_off()  # Turn off the LEDs
 
         # Create a new multiprocessing process that runs the LED control function
         self.program = multiprocessing.Process(target=led_timer_process)
