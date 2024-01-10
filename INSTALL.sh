@@ -4,6 +4,22 @@
 yes_flag=false
 help_flag=false
 
+echo "Wormstation-client installation script"
+echo "--------------------------------------"
+echo
+echo "Make sure you are running this script as a user (not root)."
+echo "This script will install the following dependencies:"
+echo "    - git"
+echo "    - python3"
+echo "    - smbclient"
+echo "    - opencv-python"
+echo "    - picam (symbolic link to cam.py)"
+echo "    - /etc/.smbpicreds (credential file for smbclient)"
+echo "    - Add current user to 'gpio', 'video' and 'input' groups"
+echo "    - Modify /etc/dphys-swapfile to extend swap size to 2GB"
+echo
+
+
 # Process command line arguments
 while getopts ":hy" opt; do
     case $opt in
@@ -108,7 +124,27 @@ else
     echo "User is already part of the 'gpio' group."
 fi
 
+# Check if user is part of video group
+if ! groups | grep -q '\bvideo\b'; then
+    read -p "You are not part of the 'video' group. This is required to properly run Wormstation-client. Do you want to add yourself to the group? (y/n): " add_to_video
+    if [ "$add_to_video" = "y" ]; then
+        sudo usermod -aG video $USER
+        echo "Added user to 'video' group. Changes will take effect after logging out and back in."
+    fi
+else
+    echo "User is already part of the 'video' group."
+fi
 
+# Check if user is part of input group
+if ! groups | grep -q '\binput\b'; then
+    read -p "You are not part of the 'input' group. This is required to properly run Wormstation-client. Do you want to add yourself to the group? (y/n): " add_to_input
+    if [ "$add_to_input" = "y" ]; then
+        sudo usermod -aG input $USER
+        echo "Added user to 'input' group. Changes will take effect after logging out and back in."
+    fi
+else
+    echo "User is already part of the 'input' group."
+fi
 
 echo Installing python dependencies...
 
