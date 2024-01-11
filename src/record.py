@@ -469,13 +469,14 @@ class Recorder:
         # get name of current user
         user = os.getlogin()
         tmp_folder = f'/home/{user}/tmp'
-        try:
-        # TODO : check if really necessary and remove or adapt
-            subprocess.run(['ln', '-sf', '%s' % pathlib.Path(self.get_last_save_path()).absolute(), f'{tmp_folder}/last_frame.jpg'])
-        except FileNotFoundError:
-            # create tmp folder
+
+        # check if tmp folder exists
+        if not os.path.exists(tmp_folder):
             subprocess.run(['mkdir', '-p', tmp_folder])
-            subprocess.run(['ln', '-sf', '%s' % pathlib.Path(self.get_last_save_path()).absolute(), f'{tmp_folder}/last_frame.jpg'])
+
+        subprocess.run(
+            ['ln', '-sf', '%s' % pathlib.Path(self.get_last_save_path()).absolute(), f'{tmp_folder}/last_frame.jpg'])
+
 
 ### Other utility functions
 
