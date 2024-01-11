@@ -112,16 +112,9 @@ else
     fi
 fi
 
-# Check if the script is run with sudo
-if [ "$EUID" -eq 0 ]; then
-    user_to_check=$SUDO_USER
-else
-    user_to_check=$USER
-fi
-
 
 # Check if user is part of gpio group
-if id -nG "$user_to_check" | grep -q '\bgpio\b'; then
+if ! groups | grep -q '\bgpio\b'; then
     read -p "You are not part of the 'gpio' group. This is required to properly run Wormstation-client. Do you want to add yourself to the group? (y/n): " add_to_gpio
     if [ "$add_to_gpio" = "y" ]; then
         sudo usermod -aG gpio $USER
@@ -132,7 +125,7 @@ else
 fi
 
 # Check if user is part of video group
-if id -nG "$user_to_check" | grep -q '\bvideo\b'; then
+if ! groups | grep -q '\bvideo\b'; then
     read -p "You are not part of the 'video' group. This is required to properly run Wormstation-client. Do you want to add yourself to the group? (y/n): " add_to_video
     if [ "$add_to_video" = "y" ]; then
         sudo usermod -aG video $USER
@@ -143,7 +136,7 @@ else
 fi
 
 # Check if user is part of input group
-if id -nG "$user_to_check" | grep -q '\binput\b'; then
+if ! groups | grep -q '\binput\b'; then
     read -p "You are not part of the 'input' group. This is required to properly run Wormstation-client. Do you want to add yourself to the group? (y/n): " add_to_input
     if [ "$add_to_input" = "y" ]; then
         sudo usermod -aG input $USER
