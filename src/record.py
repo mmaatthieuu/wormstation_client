@@ -465,8 +465,17 @@ class Recorder:
         return ok
 
     def create_symlink_to_last_frame(self):
+
+        # get name of current user
+        user = os.getlogin()
+        tmp_folder = f'/home/{user}/tmp'
+        try:
         # TODO : check if really necessary and remove or adapt
-        subprocess.run(['ln', '-sf', '%s' % pathlib.Path(self.get_last_save_path()).absolute(), '/home/matthieu/tmp/last_frame.jpg'])
+            subprocess.run(['ln', '-sf', '%s' % pathlib.Path(self.get_last_save_path()).absolute(), f'{tmp_folder}/last_frame.jpg'])
+        except FileNotFoundError:
+            # create tmp folder
+            subprocess.run(['mkdir', '-p', tmp_folder])
+            subprocess.run(['ln', '-sf', '%s' % pathlib.Path(self.get_last_save_path()).absolute(), f'{tmp_folder}/last_frame.jpg'])
 
 ### Other utility functions
 
