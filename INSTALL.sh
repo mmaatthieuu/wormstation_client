@@ -36,6 +36,15 @@ while getopts ":hy" opt; do
     esac
 done
 
+# ask for confirmation if -y flag is not used
+if [ "$yes_flag" = false ]; then
+    read -p "Do you want to continue? (y/n): " continue_install
+    if [ "$continue_install" != "y" ]; then
+        echo "Installation aborted."
+        exit 0
+    fi
+fi
+
 # Display help and exit if -h flag is used
 if [ "$help_flag" = true ]; then
     echo "Usage: $(basename $0) [-y] [-h]"
