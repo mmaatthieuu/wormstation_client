@@ -45,7 +45,10 @@ class Recorder:
         # If the camera is initialized first, it produces only black frames...
         # It is weird, but at least it works like that
         if self.parameters["use_samba"]:
-            self.smb_output = self.create_smb_tree_structure()
+            self.smb_output = self.create_tree_structure("smb")
+        elif self.parameters["use_ssh"]:
+            self.ssh_output = self.create_tree_structure("ssh")
+
 
         # Create the camera object with the input parameters
         self.camera = Camera(parameters=self.parameters)
@@ -435,16 +438,24 @@ class Recorder:
             return ok
         return True
 
-    def create_smb_tree_structure(self):
+    def create_tree_structure(self, protocol):
         try:
             folder1 = f'{(datetime.now()).strftime("%Y%m%d_%H%M")}_{self.parameters["recording_name"]}'
         except:
             folder1 = (datetime.now()).strftime("%Y%m%d_%H%M")
         folder2 = gethostname()
-        self.smbcommand(command=f'mkdir {folder1}', working_dir=self.parameters["smb_dir"])
-        self.smbcommand(command=f'mkdir {folder1}/{folder2}', working_dir=self.parameters["smb_dir"])
 
-        return f'{self.parameters["smb_dir"]}/{folder1}/{folder2}'
+        if protocol == "smb":
+            self.smbcommand(command=f'mkdir {folder1}', working_dir=self.parameters["smb_dir"])
+            self.smbcommand(command=f'mkdir {folder1}/{folder2}', working_dir=self.parameters["smb_dir"])
+
+            return f'{self.parameters["smb_dir"]}/{folder1}/{folder2}'
+        if protocol == "ssh":
+            user = os.getlogin()
+            #self.sshcommand(command=f'mkdir {folder1}', working_dir=self.parameters["ssh_dir"])
+            self.sshcommand(command=f'mkdir -p {folder1}/{folder2}', working_dir=self.parameters["ssh_dir"])
+
+            return f'{self.parameters["ssh_dir"]}/{folder1}/{folder2}'
 
     def smbcommand(self, command, working_dir=None):
         if working_dir is None:
@@ -459,6 +470,22 @@ class Recorder:
                  '-A', f'{self.parameters["credentials_file"]}',
                  '-D', f'{working_dir}',
                  '-c', f'{command}'],
+                capture_output=True)
+        except Exception as e:
+            self.logger.log(e)
+        return ok
+
+    def sshcommand(self, command, working_dir=None):
+        user = os.getlogin()
+        if working_dir is None:
+            working_dir = self.ssh_output
+
+        ok = False
+        try:
+            ok = subprocess.run(
+                ['ssh',
+                 f'{user}@{self.parameters["ssh_destination"]}',
+                 f'{command}'],
                 capture_output=True)
         except Exception as e:
             self.logger.log(e)
