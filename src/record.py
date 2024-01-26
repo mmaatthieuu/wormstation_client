@@ -487,6 +487,8 @@ class Recorder:
                  f'{user}@{self.parameters["ssh_destination"]}',
                  f'{command}'],
                 capture_output=True)
+
+            print(f'ssh {user}@{self.parameters["ssh_destination"]} {command}')
         except Exception as e:
             self.logger.log(e)
         return ok
