@@ -208,7 +208,7 @@ class Recorder:
                     #self.save_frame()
 
                     if self.is_time_for_compression():
-                        self.logger.log("time for compression")
+                        #self.logger.log("time for compression")
                         self.logger.log("time for compression")
                         self.start_async_compression_and_upload(format="mkv")
 
@@ -352,8 +352,10 @@ class Recorder:
 
     def compress_and_upload(self, folder_name, format):
         #self.logger.log("start compression")
+        print(f"#DEBUG starting compression of {folder_name}, format {format}")
         compressed_file = self.compress(folder_name=folder_name, format=format)
-        if self.parameters["use_samba"] is True:
+        print(f"#DEBUG compression done, file {compressed_file}")
+        if self.parameters["use_samba"] is True or self.parameters["use_ssh"] is True:
             file_to_upload = compressed_file
             #print(f"#DEBUG uploading {file_to_upload}")
             ok = False
@@ -361,7 +363,11 @@ class Recorder:
             try:
                 while self.upload_failed(file_to_upload):
                     self.logger.log("Uploading...")
-                    ok = self.smbupload(file_to_upload=file_to_upload)
+                    print(f"#DEBUG uploading {file_to_upload}")
+                    if self.parameters["use_samba"]:
+                        ok = self.smbupload(file_to_upload=file_to_upload)
+                    elif self.parameters["use_ssh"]:
+                        ok = self.sshupload(file_to_upload=file_to_upload)
                     n_trials = n_trials+1
 
                     if n_trials > 5:
@@ -385,9 +391,21 @@ class Recorder:
 
         #self.logger.log("compression done")
 
+    def file_exists_remote(user, host, file_path):
+        command = f'test -e {file_path}'
+        result = subprocess.run(['ssh', f'{user}@{host}', command], capture_output=True)
+
+        # Check the return code
+        return result.returncode == 0
+
     def upload_failed(self, uploaded_file):
-        out_str = self.smbcommand("ls").stdout.decode("utf-8")
-        return uploaded_file not in out_str
+        if self.parameters["use_samba"]:
+            out_str = self.smbcommand("ls").stdout.decode("utf-8")
+            return uploaded_file not in out_str
+        elif self.parameters["use_ssh"]:
+            user = os.getlogin()
+            out_str = subprocess.run(['ssh', f'{user}@{self.parameters["ssh_destination"]}', 'ls'], capture_output=True).stdout.decode("utf-8")
+            return uploaded_file not in out_str
 
 
     def compress(self, folder_name, format = "tgz"):
@@ -438,6 +456,31 @@ class Recorder:
             return ok
         return True
 
+    def sshupload(self, file_to_upload, filename_at_destination=""):
+        print("sshupload")
+        if file_to_upload is not None:
+            user = os.getlogin()
+
+            print(f'scp {file_to_upload} {user}@{self.parameters["ssh_destination"]}:{self.ssh_output}/{filename_at_destination}')
+
+            ok = subprocess.run(
+                ['scp',
+                 file_to_upload,
+                 f'{user}@{self.parameters["ssh_destination"]}:{self.ssh_output}/{filename_at_destination}'],
+                capture_output=False)
+
+            extension = pathlib.Path(file_to_upload).suffix
+
+            if ok and extension == ".tgz":
+                #print(ok)
+                try:
+                    os.remove(file_to_upload)
+                except OSError as e:
+                    self.logger.log("Error: %s - %s." % (e.filename, e.strerror))
+
+            return ok
+        return True
+
     def create_tree_structure(self, protocol):
         try:
             folder1 = f'{(datetime.now()).strftime("%Y%m%d_%H%M")}_{self.parameters["recording_name"]}'
@@ -452,8 +495,10 @@ class Recorder:
             return f'{self.parameters["smb_dir"]}/{folder1}/{folder2}'
         if protocol == "ssh":
             user = os.getlogin()
+            command = f'mkdir -p {self.parameters["ssh_dir"]}/{folder1}/{folder2}'
+            print(command)
             #self.sshcommand(command=f'mkdir {folder1}', working_dir=self.parameters["ssh_dir"])
-            self.sshcommand(command=f'mkdir -p {folder1}/{folder2}', working_dir=self.parameters["ssh_dir"])
+            self.sshcommand(command=command)
 
             return f'{self.parameters["ssh_dir"]}/{folder1}/{folder2}'
 
@@ -477,18 +522,20 @@ class Recorder:
 
     def sshcommand(self, command, working_dir=None):
         user = os.getlogin()
-        if working_dir is None:
-            working_dir = self.ssh_output
+        # if working_dir is None:
+        #     working_dir = self.ssh_output
 
         ok = False
         try:
+            print(f'ssh {user}@{self.parameters["ssh_destination"]} "{command}"')
+
             ok = subprocess.run(
                 ['ssh',
                  f'{user}@{self.parameters["ssh_destination"]}',
-                 f'{command}'],
-                capture_output=True)
+                 command],
+                capture_output=False)
 
-            print(f'ssh {user}@{self.parameters["ssh_destination"]} {command}')
+
         except Exception as e:
             self.logger.log(e)
         return ok
