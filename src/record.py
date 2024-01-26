@@ -401,6 +401,8 @@ class Recorder:
 
         #self.logger.log("compression done")
 
+
+
     def delete_local_files(self, folder_name):
         subprocess.run(['rm', '-rf', '%s' % folder_name])
         subprocess.run(['rm', '-rf', '%s.tgz' % folder_name])
@@ -804,6 +806,8 @@ def detect_circles(binary_frame, max_distance_from_center=200):
 
     return None
 def draw_circles(frame, circle_info):
+    #not used
+    print("draw_circles")
     if circle_info is not None:
         # Convert circle coordinates to integers
         circle_center, circle_radius = circle_info
