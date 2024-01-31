@@ -365,13 +365,13 @@ class Recorder:
 
         if self.parameters["use_samba"] is True or self.parameters["use_ssh"] is True:
             file_to_upload = compressed_file
-            #print(f"#DEBUG uploading {file_to_upload}")
+            print(f"#DEBUG uploading {file_to_upload}")
             ok = False
             n_trials = 0
             try:
                 while self.upload_failed(file_to_upload):
                     self.logger.log("Uploading...")
-                    print(f"#DEBUG uploading {file_to_upload}")
+                    print(f"#DEBUG uploading {file_to_upload}, trial {n_trials}")
                     if self.parameters["use_samba"]:
                         ok = self.smbupload(file_to_upload=file_to_upload)
                     elif self.parameters["use_ssh"]:
@@ -383,6 +383,7 @@ class Recorder:
                     n_trials = n_trials+1
 
                     if n_trials > 5:
+                        print(f"#DEBUG ulpoad failed {n_trials} times")
                         raise TimeoutError("Uplaod failed")
 
                 self.logger.log("Upload successful")
@@ -475,11 +476,11 @@ class Recorder:
         return True
 
     def sshupload(self, file_to_upload, filename_at_destination=""):
-        print("sshupload")
+        #print("sshupload")
         if file_to_upload is not None:
             user = os.getlogin()
 
-            print(f'scp {file_to_upload} {user}@{self.parameters["ssh_destination"]}:{self.ssh_output}/{filename_at_destination}')
+            #print(f'scp {file_to_upload} {user}@{self.parameters["ssh_destination"]}:{self.ssh_output}/{filename_at_destination}')
 
             ok = subprocess.run(
                 ['scp',
