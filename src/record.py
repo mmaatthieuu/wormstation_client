@@ -424,8 +424,8 @@ class Recorder:
         elif self.parameters["use_ssh"]:
             user = os.getlogin()
             out_str = subprocess.run(['ssh', f'{user}@{self.parameters["ssh_destination"]}',
-                                      'ls', self.parameters["ssh_dir"]], capture_output=True).stdout.decode("utf-8")
-            print(f'ssh {user}@{self.parameters["ssh_destination"]} ls {self.parameters["ssh_dir"]}')
+                                      'ls', self.ssh_output], capture_output=True).stdout.decode("utf-8")
+            print(f'ssh {user}@{self.parameters["ssh_destination"]} ls {self.ssh_output}')
             print(out_str)
             return uploaded_file not in out_str
 
