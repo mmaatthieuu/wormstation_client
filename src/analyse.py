@@ -1,11 +1,12 @@
 import cv2
+import sys
 
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import csv
 
 class Analyser:
-    def __init__(self):
+    def __init__(self, visualization=False):
         pass
 
     def compute_chemotaxis(self, video_path):
@@ -377,3 +378,17 @@ class Analyser:
 
         plt.savefig(pdf_filename, format='pdf')
         plt.savefig(png_filename, format='png')
+
+def main():
+    if len(sys.argv) != 2:
+        print("Usage: python analyse.py video_path")
+        return
+
+    video_path = sys.argv[1]
+
+    analyser = Analyser(visualization=True)
+    positions = analyser.compute_chemotaxis(video_path)
+    # analyser.compute_average_velocity(positions)
+
+if __name__ == "__main__":
+    main()
