@@ -633,6 +633,7 @@ class Recorder:
 
 
     def compute_total_number_of_frames(self):
+        print("entered compute_total_number_of_frames")
         n_frames = 0
         try:
             if not self.pause_mode:
@@ -662,6 +663,7 @@ class Recorder:
 
     def get_needed_output_format(self):
         print("entered get_needed_output_format")
+        print(self.n_frames_total)
         digits = int(ceil(log10(self.n_frames_total)))
         print(digits)
         if digits == 0:
