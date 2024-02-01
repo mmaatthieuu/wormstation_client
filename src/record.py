@@ -60,6 +60,9 @@ class Recorder:
         self.logger = Logger(verbosity_level=parameters["verbosity_level"], save_log=self.is_it_useful_to_save_logs())
 
         self.current_frame = None
+
+        self.pause_mode = self.get_pause_mode()
+
         self.current_frame_number = 0
         self.number_of_skipped_frames = 0
         self.n_frames_total = self.compute_total_number_of_frames()
@@ -78,7 +81,7 @@ class Recorder:
         self.pulse_duration = self.parameters["pulse_duration"]
         self.pulse_interval = self.parameters["pulse_interval"]
 
-        self.pause_mode = self.get_pause_mode()
+
 
         self.git_version = git_version
 
