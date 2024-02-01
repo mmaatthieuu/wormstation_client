@@ -654,13 +654,16 @@ class Recorder:
 
     def read_output_filename(self):
         f = self.parameters["output_filename"]
+        print("entered read_output_filename")
         if f == "auto":
             return self.get_needed_output_format()
         else:
             return f
 
     def get_needed_output_format(self):
+        print("entered get_needed_output_format")
         digits = int(ceil(log10(self.n_frames_total)))
+        print(digits)
         if digits == 0:
             digits+=1
         return f'%0{digits}d.jpg'
