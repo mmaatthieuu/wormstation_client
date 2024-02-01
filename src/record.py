@@ -268,7 +268,7 @@ class Recorder:
 
         else:
             delay = time.time() - (self.initial_time +
-                                        self.current_frame_number * self.parameters["time_interval"] -
+                                        self.current_frame_number * self.parameters["time_interval"] +
                                         self.pause_number * self.pause_time)
 
             print(f'current time - initial time : {time.time() - self.initial_time}')
