@@ -646,7 +646,7 @@ class Recorder:
                     n_frames = 1
             else:
                 print("DEBUG WARNING: record_every_h is in minutes, not hours")
-                numer_of_acquisitions = int(self.parameters["timeout"] / self.parameters["record_every_h"]*60)
+                numer_of_acquisitions = int(self.parameters["timeout"] / (self.parameters["record_every_h"]*60))
                 print(f'timeout : {self.parameters["timeout"]}')
                 print(f'record_every_h : {self.parameters["record_every_h"]}')
                 print(f'number of acquisitions : {numer_of_acquisitions}')
