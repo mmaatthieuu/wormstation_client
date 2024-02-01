@@ -259,24 +259,16 @@ class Recorder:
         # Wait
         # Check if the current frame is on time
 
-        delay =0
+        delay = self.get_delay()
 
-        if self.pause_mode is False:
-            delay = time.time() - (self.initial_time +
-                                        self.current_frame_number * self.parameters["time_interval"]) + \
-                         self.parameters["start_frame"] * self.parameters["time_interval"]
 
-        else:
-            delay = time.time() - (self.initial_time +
-                                        self.current_frame_number * self.parameters["time_interval"] +
-                                        self.pause_number * self.pause_time)
 
-            print(f'current time - initial time : {time.time() - self.initial_time}')
-            print(f'1- {self.current_frame_number * self.parameters["time_interval"]}')
-            print(f'2- {self.pause_number * self.pause_time/self.parameters["time_interval"]}')
-            print(f'pause time : {self.pause_time}')
-            print(f'pause number : {self.pause_number}')
-            print(f'delay : {delay}')
+        # print(f'current time - initial time : {time.time() - self.initial_time}')
+        # print(f'1- {self.current_frame_number * self.parameters["time_interval"]}')
+        # print(f'2- {self.pause_number * self.pause_time/self.parameters["time_interval"]}')
+        # print(f'pause time : {self.pause_time}')
+        # print(f'pause number : {self.pause_number}')
+        # print(f'delay : {delay}')
 
         # If too early, wait until it is time to record
         #print(delay)
@@ -305,6 +297,21 @@ class Recorder:
                 self.current_frame_number < (self.n_frames_total - 1) and self.pause_mode is False:
             self.skip_frame = True
             self.logger.log(f"Delay too long : Frame {self.current_frame_number} skipped", begin="\n    WARNING    ")
+
+
+    def get_delay(self):
+        delay = 0
+        if self.pause_mode is False:
+            delay = time.time() - (self.initial_time +
+                                   self.current_frame_number * self.parameters["time_interval"]) + \
+                    self.parameters["start_frame"] * self.parameters["time_interval"]
+
+        else:
+            delay = time.time() - (self.initial_time +
+                                   self.current_frame_number * self.parameters["time_interval"] +
+                                   self.pause_number * self.pause_time)
+
+        return delay
 
     def log_progress(self):
         if self.parameters["verbosity_level"] >= 2:
