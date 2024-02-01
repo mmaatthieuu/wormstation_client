@@ -642,6 +642,8 @@ class Recorder:
             return True
 
     def is_it_pause_time(self, frame_number):
+        if self.pause_mode is False:
+            return False
         number_of_frames_per_batch = self.parameters["record_for_s"] / self.parameters["time_interval"]
         if frame_number % number_of_frames_per_batch == 0 and frame_number != 0:
             return True
