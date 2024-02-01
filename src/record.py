@@ -157,7 +157,7 @@ class Recorder:
         # Main recording loop
         for self.current_frame_number in range(self.parameters["start_frame"], self.n_frames_total):
             self.skip_frame = False
-            #print(f'frame {self.current_frame_number} start: {datetime.now() - self.initial_datetime}')
+            print(f'frame {self.current_frame_number}')
 
             if self.is_it_pause_time(self.current_frame_number):
                 pause_time = self.parameters["record_every_h"]*60 - self.parameters["record_for_s"]
