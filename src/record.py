@@ -97,10 +97,10 @@ class Recorder:
         #subprocess.run(['pkill', 'cpulimit'])
         del self.camera
 
-        if not self.preview_only():
-            self.leds.turn_off()
-            if self.optogenetic:
-                self.opto_leds.turn_off()
+        # if not self.preview_only():
+        #     self.leds.turn_off()
+        #     if self.optogenetic:
+        #         self.opto_leds.turn_off()
 
     def start_recording(self):
         """
