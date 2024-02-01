@@ -64,6 +64,8 @@ class Recorder:
         self.number_of_skipped_frames = 0
         self.n_frames_total = self.compute_total_number_of_frames()
 
+        print(f"n_frames_total : {self.n_frames_total}")
+
         self.compress_step = self.parameters["compress"]
 
         self.skip_frame = False
