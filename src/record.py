@@ -634,6 +634,7 @@ class Recorder:
 
     def compute_total_number_of_frames(self):
         print("entered compute_total_number_of_frames")
+        print(self.pause_mode)
         n_frames = 0
         try:
             if not self.pause_mode:
