@@ -285,7 +285,7 @@ class Recorder:
         # goes to the next one
         # The condition on current_frame_number is useful if one just wants one frame and does not care about time sync
         if delay >= self.parameters["time_interval"] and \
-                self.current_frame_number < (self.n_frames_total - 1):
+                self.current_frame_number < (self.n_frames_total - 1) and self.pause_mode is False:
             self.skip_frame = True
             self.logger.log(f"Delay too long : Frame {self.current_frame_number} skipped", begin="\n    WARNING    ")
 
