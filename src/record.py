@@ -651,9 +651,10 @@ class Recorder:
             return False
     def pause_recording_in_s(self, time_to_pause):
         self.logger.log(f"Pausing recording for {time_to_pause} seconds ({time_to_pause/3600} hours)")
-        if time_to_pause > 5:
+        if time_to_pause > 10:
+            time.sleep(5)
             self.leds.turn_off()
-            time.sleep(time_to_pause-5)
+            time.sleep(time_to_pause-10)
             self.leds.turn_on()
             time.sleep(5)
             self.pause_number += 1
