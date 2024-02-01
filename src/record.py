@@ -62,6 +62,8 @@ class Recorder:
         self.current_frame = None
 
         self.pause_mode = self.get_pause_mode()
+        self.pause_number=0
+        self.pause_time = self.parameters["record_every_h"]*60 - self.parameters["record_for_s"]
 
         self.current_frame_number = 0
         self.number_of_skipped_frames = 0
@@ -160,8 +162,8 @@ class Recorder:
             print(f'frame {self.current_frame_number}')
 
             if self.is_it_pause_time(self.current_frame_number):
-                pause_time = self.parameters["record_every_h"]*60 - self.parameters["record_for_s"]
-                self.pause_recording_in_s(pause_time)
+                #pause_time = self.parameters["record_every_h"]*60 - self.parameters["record_for_s"]
+                self.pause_recording_in_s(self.pause_time)
 
             # (Re)Initialize the current frame
             #self.current_frame = np.empty((3040, 4056, 3), dtype=np.uint8)
@@ -257,9 +259,20 @@ class Recorder:
         # Wait
         # Check if the current frame is on time
 
-        delay = time.time() - (self.initial_time +
-                                    self.current_frame_number * self.parameters["time_interval"]) + \
-                     self.parameters["start_frame"] * self.parameters["time_interval"]
+        delay =0
+
+        if self.pause_mode is False:
+            delay = time.time() - (self.initial_time +
+                                        self.current_frame_number * self.parameters["time_interval"]) + \
+                         self.parameters["start_frame"] * self.parameters["time_interval"]
+
+        else:
+            delay = time.time() - (self.initial_time +
+                                        self.current_frame_number * self.parameters["time_interval"] -
+                                        self.pause_number * self.pause_time/self.parameters["time_interval"])
+
+            print(f'1- {self.current_frame_number * self.parameters["time_interval"]}')
+            print(f'2- {self.pause_number * self.pause_time/self.parameters["time_interval"]}')
 
         # If too early, wait until it is time to record
         #print(delay)
@@ -630,6 +643,7 @@ class Recorder:
             time.sleep(time_to_pause-5)
             self.leds.turn_on()
             time.sleep(5)
+            self.pause_number += 1
         else:
             time.sleep(time_to_pause)
         self.logger.log("Recording resumed")
