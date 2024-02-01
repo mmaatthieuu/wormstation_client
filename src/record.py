@@ -78,6 +78,8 @@ class Recorder:
         self.pulse_duration = self.parameters["pulse_duration"]
         self.pulse_interval = self.parameters["pulse_interval"]
 
+        self.pause_mode = self.get_pause_mode()
+
         self.git_version = git_version
 
         self.leds = LED(_control_gpio_pin=17)
@@ -252,9 +254,16 @@ class Recorder:
         # Wait
         # Check if the current frame is on time
 
+        # TODO Improve that
+        #delay = 0
+        #if not self.pause_mode:
         delay = time.time() - (self.initial_time +
                                     self.current_frame_number * self.parameters["time_interval"]) + \
                      self.parameters["start_frame"] * self.parameters["time_interval"]
+        # else:
+        #     delay = time.time() - (self.initial_time +
+        #                             self.current_frame_number * self.parameters["time_interval"]) + \
+        #              self.parameters["start_frame"] * self.parameters["record_every_h"]*60
 
         # If too early, wait until it is time to record
         #print(delay)
@@ -280,7 +289,7 @@ class Recorder:
         # goes to the next one
         # The condition on current_frame_number is useful if one just wants one frame and does not care about time sync
         if delay >= self.parameters["time_interval"] and \
-                self.current_frame_number < (self.n_frames_total - 1):
+                self.current_frame_number < (self.n_frames_total - 1) and self.pause_mode is False:
             self.skip_frame = True
             self.logger.log(f"Delay too long : Frame {self.current_frame_number} skipped", begin="\n    WARNING    ")
 
@@ -606,6 +615,12 @@ class Recorder:
 
         os.chdir(self.parameters["local_tmp_dir"])
 
+    def get_pause_mode(self):
+        if self.parameters["record_for_s"] == 0 or self.parameters["record_every_h"] == 0:
+            return False
+        else:
+            return True
+
     def is_it_pause_time(self, frame_number):
         number_of_frames_per_batch = self.parameters["record_for_s"] / self.parameters["time_interval"]
         if frame_number % number_of_frames_per_batch == 0 and frame_number != 0:
@@ -627,7 +642,7 @@ class Recorder:
     def compute_total_number_of_frames(self):
         n_frames = 0
         try:
-            if self.parameters["record_for_s"] == 0 or self.parameters["record_every_h"] == 0:
+            if not self.pause_mode:
                 n_frames = int(self.parameters["timeout"] / self.parameters["time_interval"])
                 if n_frames == 0:
                     n_frames = 1
