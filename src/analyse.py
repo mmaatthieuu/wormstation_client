@@ -365,7 +365,7 @@ class Analyser:
                           columns=['frame', 'x', 'y'])
 
         # Use trackpy's link_df to link the points between frames
-        linked_df = tp.link_df(df, search_range=30, memory=3, print_status=False)
+        linked_df = tp.link_df(df, search_range=30, memory=3)
 
         # Check if 'particle' column exists in the DataFrame
         if 'particle' not in linked_df.columns:
