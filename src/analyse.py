@@ -2,16 +2,28 @@ import cv2
 import sys
 
 import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
 from tqdm import tqdm
 import csv
 
+import trackpy as tp
+import pandas as pd
+
+import numpy as np
+
 class Analyser:
     def __init__(self, visualization=False):
-        pass
+        self.video_path = None
+        self.visualization = visualization
 
     def compute_chemotaxis(self, video_path):
         #self.logger.log("Computing chemotaxis")
+
+        print("Use run() instead. Exiting.")
+        return
+
         print(f"Computing chemotaxis for {video_path}")
+        self.video_path = video_path
         # self.logger.log("Starting compression of %s" % folder_name)
 
         # Call the load_video function
@@ -47,13 +59,53 @@ class Analyser:
         # save_centers_to_csv(positions, 'centers.csv')
 
         # Save chemotaxis indices to CSV file
-        self.save_chemotaxis_indices_to_csv(chemotaxis_index_by_frame, 'chemotaxis_indices.csv')
+        self.save_chemotaxis_indices_to_csv(chemotaxis_index_by_frame, 'data.csv')
 
         # Plot chemotaxis index
         self.plot_chemotaxis_index(chemotaxis_index_by_frame)
 
         # Release the video capture object when done
         cap.release()
+
+        return positions
+
+    def run(self, video_path):
+        #self.logger.log("Running analysis")
+        print(f"Running analysis for {video_path}")
+
+        # Call the load_video function
+        cap, width, height = self.load_video(video_path)
+
+        # Read the first frame
+        ret, first_frame = cap.read()
+        first_frame = self.get_specific_frame(video_path, 3)
+
+        if not ret:
+            print("Error: Could not read the first frame.")
+            return
+
+        # get middle of the image width
+        middle = int(width / 2)
+
+        # Remove background
+        positions = self.locate_worms(video_path)
+
+        speed_stats, trajectories = self.compute_average_velocity_with_trackpy(positions)
+
+        # Compute chemotaxis index
+        chemotaxis_data = self.compute_chemotaxis_index(positions, middle)
+
+        # Save data to CSV file
+        self.save_data_to_csv(chemotaxis_data, speed_stats, 'data.csv')
+
+        #  Plot chemotaxis index
+        self.plot_chemotaxis_data(chemotaxis_data)
+
+        # Plot mean speed
+        self.plot_mean_speed(speed_stats)
+
+
+
 
     def get_specific_frame(self, video_path, frame_number):
         # Open the video file
@@ -278,31 +330,14 @@ class Analyser:
         return all_centers_by_frame
 
     def compute_chemotaxis_index(self, all_centers_by_frame, middle):
-        # Dictionary to store chemotaxis index for each frame
-        chemotaxis_index_by_frame = {}
-
-        # if detected_circles is not None:
-        #     # Convert circle coordinates to integers
-        #     circle_center, circle_radius = detected_circles
-        #     circle_center = tuple(map(int, circle_center))
-        #     circle_radius = int(circle_radius)
-        #
-        # else:
-        #     print("No circle detected.")
-        #     return chemotaxis_index_by_frame
+        # Dictionary to store chemotaxis index and related values for each frame
+        chemotaxis_data_by_frame = {}
 
         # Iterate over frames
         for frame_index, centers_of_mass in all_centers_by_frame.items():
             print(f"Frame {frame_index}: {len(centers_of_mass)} points detected.")
 
-            # Define the left and right boundaries of the circle
-            # left_boundary = circle_center[0] - circle_radius
-            # right_boundary = circle_center[0] + circle_radius
-
             # Count points on the left and right sides of the circle
-            # left_points = sum(1 for center in centers_of_mass if left_boundary <= center[0] < circle_center[0])
-            # right_points = sum(1 for center in centers_of_mass if circle_center[0] < center[0] <= right_boundary)
-
             left_points = sum(1 for center in centers_of_mass if center[0] < middle)
             right_points = sum(1 for center in centers_of_mass if center[0] > middle)
 
@@ -313,10 +348,160 @@ class Analyser:
             print(
                 f"Frame {frame_index}: {left_points} points on the left, {right_points} points on the right, chemotaxis index = {chemotaxis_index}")
 
-            # Store chemotaxis index for the current frame
-            chemotaxis_index_by_frame[frame_index] = chemotaxis_index
+            # Store chemotaxis data for the current frame
+            chemotaxis_data_by_frame[frame_index] = {
+                'chemotaxis_index': chemotaxis_index,
+                'left_points': left_points,
+                'right_points': right_points,
+                'total_points': total_points
+            }
 
-        return chemotaxis_index_by_frame
+        return chemotaxis_data_by_frame
+
+    def compute_average_velocity_with_trackpy(self, all_centers_by_frame, frame_rate=2):
+        # Convert the dictionary of centers to a DataFrame compatible with trackpy
+        df = pd.DataFrame([(frame, x, y) for frame, centers in all_centers_by_frame.items() for x, y in centers],
+                          columns=['frame', 'x', 'y'])
+
+        # Use trackpy's link_df to link the points between frames
+        linked_df = tp.link_df(df, search_range=30, memory=3)
+
+        # Check if 'particle' column exists in the DataFrame
+        if 'particle' not in linked_df.columns:
+            print("No trajectories found. Check the linking parameters or data quality.")
+            return
+
+        # Calculate displacement for each particle between frames
+        linked_df['dx'] = linked_df.groupby('particle')['x'].diff()
+        linked_df['dy'] = linked_df.groupby('particle')['y'].diff()
+
+        # Calculate velocity in pixels per frame
+        linked_df['velocity'] = np.sqrt(linked_df['dx'] ** 2 + linked_df['dy'] ** 2)
+
+        # Exclude frames at boundaries
+        #linked_df = linked_df[(linked_df['frame'] > 0) & (linked_df['frame'] < max(linked_df['frame']))]
+
+        # Calculate average and standard deviation of velocity for each frame
+        result_df = linked_df.groupby('frame')['velocity'].agg(['mean', 'std']).reset_index()
+
+        # Print or use the result as needed
+        print(result_df)
+
+        # Display images with lines showing assignments
+        # self.display_images_with_assignments(result_df['frame'], all_centers_by_frame,
+        #                                      result_df['particle'].astype(int),
+        #                                      result_df['particle'].astype(int) + 1)
+
+        return result_df, linked_df
+
+    def compute_speed_for_trajectories(self, all_centers_by_frame):
+        speeds_by_frame = {}
+        for frame in all_centers_by_frame:
+            centers = np.array(all_centers_by_frame[frame])
+            if len(centers) > 1:
+                # Calculate the distance traveled by each trajectory
+                distances = np.linalg.norm(np.diff(centers, axis=0), axis=1)
+                speeds = distances / 2.0  # Assuming a frame rate of 2 frames per second
+                speeds_by_frame[frame] = speeds
+            else:
+                speeds_by_frame[frame] = np.array([])
+
+        return speeds_by_frame
+
+
+    def play_movie_with_linked_trajectories(self, video_path, all_centers_by_frame, trajectories):
+        # Open the video file
+        cap = cv2.VideoCapture(video_path)
+
+        # Check if the video file was successfully opened
+        if not cap.isOpened():
+            print("Error: Could not open video file.")
+            return
+
+        # Set up the figure and axis for animation
+        fig, ax = plt.subplots()
+        plt.title('Linked Trajectories Overlay')
+        plt.xlabel('X')
+        plt.ylabel('Y')
+
+        # Function to update the animation frames
+        def update(frame):
+            # Read a frame from the video
+            ret, frame_image = cap.read()
+
+            if not ret:
+                print("End of video stream.")
+                ani.event_source.stop()
+                return
+
+            # Plot the frame
+            ax.clear()
+            ax.imshow(frame_image)
+
+            # Plot centers for the current frame
+            centers = all_centers_by_frame.get(frame, [])
+            if centers:
+                centers = np.array(centers)
+                ax.scatter(centers[:, 0], centers[:, 1], color='red', marker='+')
+
+            # Plot lines connecting particles according to their ID
+            for _, row in trajectories[trajectories['frame'] == frame].iterrows():
+                particle_id = int(row['particle'])
+                if particle_id in trajectories['particle'].values:
+                    prev_pos = \
+                    trajectories[(trajectories['frame'] == frame - 1) & (trajectories['particle'] == particle_id)][
+                        ['x', 'y']].values
+
+                    # Check if prev_pos is not empty
+                    if len(prev_pos) > 0:
+                        current_pos = row[['x', 'y']].values
+                        ax.plot([prev_pos[0, 0], current_pos[0]], [prev_pos[0, 1], current_pos[1]], color='blue')
+
+        # Create an animation
+        ani = FuncAnimation(fig, update, frames=len(all_centers_by_frame), interval=50, repeat=False)
+
+        # Display the animation
+        plt.show()
+
+        # Release the video capture object when done
+        cap.release()
+        plt.close()
+
+
+
+    def display_images_with_assignments(self, frames, centers_by_frame, row_ind, col_ind):
+        for i in range(len(frames) - 1):
+            img1 = self.get_specific_frame(self.video_path, frames[i])
+            img2 = self.get_specific_frame(self.video_path, frames[i + 1])
+
+            for j, k in zip(row_ind, col_ind):
+                pt1 = tuple(centers_by_frame[i][j])
+                pt2 = tuple(centers_by_frame[i + 1][k])
+
+                # Draw a line between assigned points
+                color = (0, 255, 0)  # Green color for lines
+                thickness = 2
+                cv2.line(img1, pt1, pt2, color, thickness)
+                cv2.circle(img1, pt1, 5, color, -1)
+                cv2.circle(img2, pt2, 5, color, -1)
+
+            # Display images with lines
+            self.display_two_images(img1, img2, f"Assignment between frames {frames[i]} and {frames[i + 1]}")
+
+    def display_two_images(self, img1, img2, title):
+        plt.figure(figsize=(12, 6))
+        plt.subplot(1, 2, 1)
+        plt.imshow(cv2.cvtColor(img1, cv2.COLOR_BGR2RGB))
+        # plt.title(f"Frame {frames[i]}")
+        plt.axis('off')
+
+        plt.subplot(1, 2, 2)
+        plt.imshow(cv2.cvtColor(img2, cv2.COLOR_BGR2RGB))
+        # plt.title(f"Frame {frames[i + 1]}")
+        plt.axis('off')
+
+        plt.suptitle(title)
+        plt.show()
 
     def save_centers_to_csv(self, centers_list, csv_filename):
         """
@@ -342,35 +527,74 @@ class Analyser:
         Save the chemotaxis indices to a CSV file.
 
         Parameters:
-        - chemotaxis_indices: List of chemotaxis indices for each frame.
+        - chemotaxis_indices: Dictionary of chemotaxis indices for each frame.
         - csv_filename: Name of the CSV file to save.
 
         Example:
-        save_chemotaxis_indices_to_csv([0.1, 0.2, 0.3], 'chemotaxis_indices.csv')
+        save_chemotaxis_indices_to_csv({1: 0.1, 2: 0.2, 3: 0.3}, 'chemotaxis_indices.csv')
         """
         with open(csv_filename, 'w', newline='') as csvfile:
             csv_writer = csv.writer(csvfile)
             csv_writer.writerow(['Frame', 'Chemotaxis Index'])  # Writing header
 
-            for frame, chemotaxis_index in enumerate(chemotaxis_indices, start=1):
+            for frame, chemotaxis_index in chemotaxis_indices.items():
                 csv_writer.writerow([frame, chemotaxis_index])
 
-    def plot_chemotaxis_index(self, chemotaxis_index_by_frame, frame_rate=2, output_prefix="chemotaxis_plot", font_size=14):
-        # Calculate time in minutes for each frame
-        time_in_minutes = [frame_index * frame_rate / 60 for frame_index in sorted(chemotaxis_index_by_frame.keys())]
+    import csv
 
-        # Extract chemotaxis index values
-        chemotaxis_values = [chemotaxis_index_by_frame[frame_index] for frame_index in
-                             sorted(chemotaxis_index_by_frame.keys())]
+    def save_data_to_csv(self, chemotaxis_data, result_df, csv_filename):
+        """
+        Save chemotaxis data along with mean speed information to a CSV file.
+
+        Parameters:
+        - chemotaxis_data: Dictionary of chemotaxis data for each frame.
+        - result_df: DataFrame containing mean speed and speed std for each frame.
+        - csv_filename: Name of the CSV file to save.
+
+        Example:
+        save_chemotaxis_data_to_csv({1: {'chemotaxis_index': 0.1, 'left_points': 10, 'right_points': 5, 'total_points': 15}},
+                                    result_df, 'chemotaxis_data.csv')
+        """
+        with open(csv_filename, 'w', newline='') as csvfile:
+            csv_writer = csv.writer(csvfile)
+            csv_writer.writerow(['Frame', 'Chemotaxis Index', 'Mean Speed', 'Speed Std', 'Left Points', 'Right Points',
+                                 'Total Points'])  # Writing header
+
+            for frame, chemotaxis_info in chemotaxis_data.items():
+                mean_speed_info = result_df[result_df['frame'] == frame].iloc[0]
+                csv_writer.writerow([frame,
+                                     chemotaxis_info['chemotaxis_index'],
+                                     mean_speed_info['mean'],
+                                     mean_speed_info['std'],
+                                     chemotaxis_info['left_points'],
+                                     chemotaxis_info['right_points'],
+                                     chemotaxis_info['total_points']])
+
+
+    def plot_chemotaxis_data(self, chemotaxis_data, frame_rate=2, output_prefix="chemotaxis_plot",
+                             font_size=14):
+        # Extract frame indices
+        frame_indices = sorted(chemotaxis_data.keys())
+
+        # Calculate time in minutes for each frame
+        time_in_minutes = [frame_index * frame_rate / 60 for frame_index in frame_indices]
+
+        # Extract chemotaxis index values, mean speed, and speed std
+        chemotaxis_values = [chemotaxis_data[frame]['chemotaxis_index'] for frame in frame_indices]
 
         # Plot chemotaxis index with respect to time
         plt.figure(figsize=(10, 6))
-        plt.plot(time_in_minutes, chemotaxis_values, marker='o', linestyle='-', color='b')
-        plt.title('Chemotaxis Index Over Time', fontsize=font_size)
+        plt.plot(time_in_minutes, chemotaxis_values, marker='o', linestyle='-', color='b', label='Chemotaxis Index')
+        plt.title(f'Chemotaxis Index and Mean Speed Over Time', fontsize=font_size)
         plt.xlabel('Time (minutes)', fontsize=font_size)
         plt.ylabel('Chemotaxis Index', fontsize=font_size)
         plt.xticks(fontsize=font_size)
         plt.yticks(fontsize=font_size)
+
+        # Add mean speed information to the plot title
+        plt.title(
+            f'Chemotaxis Index Time',
+            fontsize=font_size)
 
         # Save the plot as PDF and PNG
         pdf_filename = f"{output_prefix}.pdf"
@@ -379,6 +603,38 @@ class Analyser:
         plt.savefig(pdf_filename, format='pdf')
         plt.savefig(png_filename, format='png')
 
+    def plot_mean_speed(self, result_df, output_prefix="mean_speed_plot", font_size=14):
+        # Plot mean speed against frame number
+        plt.figure(figsize=(10, 6))
+        plt.plot(result_df['frame'], result_df['mean'], label='Mean Speed', color='blue')
+
+        # Plot shaded area for standard deviation
+        plt.fill_between(result_df['frame'],
+                         result_df['mean'] - result_df['std'],
+                         result_df['mean'] + result_df['std'],
+                         alpha=0.2, color='blue', label='Standard Deviation')
+
+        # Add labels and title
+        plt.xlabel('Frame Number', fontsize=font_size)
+        plt.ylabel('Mean Speed (pixels/frame)', fontsize=font_size)
+        plt.title('Mean Speed with Standard Deviation', fontsize=font_size)
+        plt.xticks(fontsize=font_size)
+        plt.yticks(fontsize=font_size)
+
+        # Show legend
+        plt.legend()
+
+        # Save the plot as PDF and PNG
+        pdf_filename = f"{output_prefix}.pdf"
+        png_filename = f"{output_prefix}.png"
+
+        plt.savefig(pdf_filename, format='pdf')
+        plt.savefig(png_filename, format='png')
+
+        if self.visualization:
+            # Display the plot
+            plt.show()
+
 def main():
     if len(sys.argv) != 2:
         print("Usage: python analyse.py video_path")
@@ -386,9 +642,15 @@ def main():
 
     video_path = sys.argv[1]
 
-    analyser = Analyser(visualization=True)
-    positions = analyser.compute_chemotaxis(video_path)
-    # analyser.compute_average_velocity(positions)
+    analyser = Analyser()
+
+    analyser.run(video_path)
+
+    #positions = analyser.compute_chemotaxis(video_path)
+    #speed_stats, trajectories = analyser.compute_average_velocity_with_trackpy(positions)
+    #analyser.plot_mean_speed(speed_stats)
+    #analyser.play_movie_with_linked_trajectories(video_path, positions, trajectories)
 
 if __name__ == "__main__":
     main()
+
