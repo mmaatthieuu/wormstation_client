@@ -273,6 +273,8 @@ class Recorder:
 
             print(f'1- {self.current_frame_number * self.parameters["time_interval"]}')
             print(f'2- {self.pause_number * self.pause_time/self.parameters["time_interval"]}')
+            print(f'pause time : {self.pause_time}')
+            print(f'pause number : {self.pause_number}')
 
         # If too early, wait until it is time to record
         #print(delay)
