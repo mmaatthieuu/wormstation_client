@@ -655,6 +655,7 @@ class Recorder:
         except ZeroDivisionError:
             n_frames = 1
         finally:
+            print(f'number of frames : {n_frames}')
             return n_frames
 
     def read_output_filename(self):
