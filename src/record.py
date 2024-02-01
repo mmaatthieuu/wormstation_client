@@ -64,8 +64,6 @@ class Recorder:
         self.number_of_skipped_frames = 0
         self.n_frames_total = self.compute_total_number_of_frames()
 
-        print(f"n_frames_total : {self.n_frames_total}")
-
         self.compress_step = self.parameters["compress"]
 
         self.skip_frame = False
@@ -256,16 +254,9 @@ class Recorder:
         # Wait
         # Check if the current frame is on time
 
-        # TODO Improve that
-        #delay = 0
-        #if not self.pause_mode:
         delay = time.time() - (self.initial_time +
                                     self.current_frame_number * self.parameters["time_interval"]) + \
                      self.parameters["start_frame"] * self.parameters["time_interval"]
-        # else:
-        #     delay = time.time() - (self.initial_time +
-        #                             self.current_frame_number * self.parameters["time_interval"]) + \
-        #              self.parameters["start_frame"] * self.parameters["record_every_h"]*60
 
         # If too early, wait until it is time to record
         #print(delay)
@@ -291,7 +282,7 @@ class Recorder:
         # goes to the next one
         # The condition on current_frame_number is useful if one just wants one frame and does not care about time sync
         if delay >= self.parameters["time_interval"] and \
-                self.current_frame_number < (self.n_frames_total - 1) and self.pause_mode is False:
+                self.current_frame_number < (self.n_frames_total - 1):
             self.skip_frame = True
             self.logger.log(f"Delay too long : Frame {self.current_frame_number} skipped", begin="\n    WARNING    ")
 
@@ -651,7 +642,9 @@ class Recorder:
             else:
                 print("DEBUG WARNING: record_every_h is in minutes, not hours")
                 numer_of_acquisitions = int(self.parameters["timeout"] / self.parameters["record_every_h"]*60)
+                print(numer_of_acquisitions)
                 n_frames = int(self.parameters["record_for_s"] / self.parameters["time_interval"]*numer_of_acquisitions)
+                print(n_frames)
                 if n_frames == 0:
                     n_frames = 1
         except ZeroDivisionError:
