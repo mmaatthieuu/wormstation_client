@@ -95,6 +95,11 @@ class Recorder:
         #subprocess.run(['pkill', 'cpulimit'])
         del self.camera
 
+        if not self.preview_only():
+            self.leds.turn_off()
+            if self.optogenetic:
+                self.opto_leds.turn_off()
+
     def start_recording(self):
         """
         Main recording function
@@ -124,10 +129,12 @@ class Recorder:
             # self.leds.start_program_in_seconds(duration_of_illumination=self.parameters["illumination_pulse"]/1000,
             #                                    period=self.parameters["time_interval"],
             #                                    timeout=self.parameters["timeout"])
+            # Todo check that
+            # self.leds.run_led_timer(duration=self.parameters["illumination_pulse"]/1000,
+            #                         period=self.parameters["time_interval"],
+            #                         timeout=self.parameters["timeout"])
 
-            self.leds.run_led_timer(duration=self.parameters["illumination_pulse"]/1000,
-                                    period=self.parameters["time_interval"],
-                                    timeout=self.parameters["timeout"])
+            self.leds.turn_on()
 
             # wait_time, _ = get_remaining_time_to_next_seconds(time.time(),4)
             # time.sleep(wait_time)
@@ -594,12 +601,36 @@ class Recorder:
 
         os.chdir(self.parameters["local_tmp_dir"])
 
+    def is_it_pause_time(self, frame_number):
+        number_of_frames_per_batch = self.parameters["record_for_s"] / self.parameters["time_interval"]
+        if frame_number % number_of_frames_per_batch == 0 and frame_number != 0:
+            return True
+        else:
+            return False
+    def pause_recording_in_s(self, time_to_pause):
+        self.logger.log(f"Pausing recording for {time_to_pause} seconds ({time_to_pause/3600} hours)")
+        if time_to_pause > 5:
+            self.leds.turn_off()
+            time.sleep(time_to_pause-5)
+            self.leds.turn_on()
+            time.sleep(5)
+        else:
+            time.sleep(time_to_pause)
+
+
     def compute_total_number_of_frames(self):
         n_frames = 0
         try:
-            n_frames = int(self.parameters["timeout"] / self.parameters["time_interval"])
-            if n_frames == 0:
-                n_frames = 1
+            if self.parameters["record_for_s"] == 0 or self.parameters["record_every_h"] == 0:
+                n_frames = int(self.parameters["timeout"] / self.parameters["time_interval"])
+                if n_frames == 0:
+                    n_frames = 1
+            else:
+                print("DEBUG WARNING: record_every_h is in minutes, not hours")
+                numer_of_acquisitions = int(self.parameters["timeout"] / self.parameters["record_every_h"]*60)
+                n_frames = int(self.parameters["record_for_s"] / self.parameters["time_interval"]*numer_of_acquisitions)
+                if n_frames == 0:
+                    n_frames = 1
         except ZeroDivisionError:
             n_frames = 1
         finally:

@@ -335,7 +335,7 @@ class Analyser:
 
         # Iterate over frames
         for frame_index, centers_of_mass in all_centers_by_frame.items():
-            print(f"Frame {frame_index}: {len(centers_of_mass)} points detected.")
+            #print(f"Frame {frame_index}: {len(centers_of_mass)} points detected.")
 
             # Count points on the left and right sides of the circle
             left_points = sum(1 for center in centers_of_mass if center[0] < middle)
@@ -345,8 +345,9 @@ class Analyser:
             total_points = len(centers_of_mass)
             chemotaxis_index = left_points / total_points if total_points > 0 else 0.0
 
-            print(
-                f"Frame {frame_index}: {left_points} points on the left, {right_points} points on the right, chemotaxis index = {chemotaxis_index}")
+            # print(
+            #     f"Frame {frame_index}: {left_points} points on the left, "
+            #     f"{right_points} points on the right, chemotaxis index = {chemotaxis_index}")
 
             # Store chemotaxis data for the current frame
             chemotaxis_data_by_frame[frame_index] = {
@@ -364,7 +365,7 @@ class Analyser:
                           columns=['frame', 'x', 'y'])
 
         # Use trackpy's link_df to link the points between frames
-        linked_df = tp.link_df(df, search_range=30, memory=3)
+        linked_df = tp.link_df(df, search_range=30, memory=3, print_status=False)
 
         # Check if 'particle' column exists in the DataFrame
         if 'particle' not in linked_df.columns:
@@ -385,7 +386,7 @@ class Analyser:
         result_df = linked_df.groupby('frame')['velocity'].agg(['mean', 'std']).reset_index()
 
         # Print or use the result as needed
-        print(result_df)
+        #print(result_df)
 
         # Display images with lines showing assignments
         # self.display_images_with_assignments(result_df['frame'], all_centers_by_frame,
