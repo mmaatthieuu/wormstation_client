@@ -63,7 +63,7 @@ class Recorder:
 
         self.pause_mode = self.get_pause_mode()
         self.pause_number=0
-        self.pause_time = self.parameters["record_every_h"]*60 - self.parameters["record_for_s"]
+        self.pause_time = self.parameters["record_every_h"]*3600 - self.parameters["record_for_s"]
 
         self.current_frame_number = 0
         self.number_of_skipped_frames = 0
@@ -159,7 +159,7 @@ class Recorder:
         # Main recording loop
         for self.current_frame_number in range(self.parameters["start_frame"], self.n_frames_total):
             self.skip_frame = False
-            print(f'frame {self.current_frame_number}')
+            # print(f'frame {self.current_frame_number}')
 
             if self.is_it_pause_time(self.current_frame_number):
                 #pause_time = self.parameters["record_every_h"]*60 - self.parameters["record_for_s"]
@@ -674,7 +674,7 @@ class Recorder:
                     n_frames = 1
             else:
                 print("DEBUG WARNING: record_every_h is in minutes, not hours")
-                numer_of_acquisitions = int(self.parameters["timeout"] / (self.parameters["record_every_h"]*60))
+                numer_of_acquisitions = int(self.parameters["timeout"] / (self.parameters["record_every_h"]*3600))
                 print(f'timeout : {self.parameters["timeout"]}')
                 print(f'record_every_h : {self.parameters["record_every_h"]}')
                 print(f'number of acquisitions : {numer_of_acquisitions}')
