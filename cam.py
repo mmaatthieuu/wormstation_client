@@ -6,6 +6,7 @@ import os.path
 
 import subprocess
 import sys
+import signal
 import cProfile
 import pstats
 
@@ -90,10 +91,18 @@ def parse_input():
 
 
 
+def sigterm_handler(signal, frame):
+    # Handle SIGTERM signal here
+    print("Received SIGTERM signal. Stopping recording.")
+    sys.exit(0)
 
 
 
 def main():
+
+    # Set up signal handler for SIGTERM
+    signal.signal(signal.SIGTERM, sigterm_handler)
+
     # TODO : take json config as input
     parameters = Parameters(sys.argv[1])
 
@@ -118,8 +127,9 @@ def main():
 
 
     except KeyboardInterrupt:
-        #log("\nScript interrupted by user")
 
+        recorder.logger.log("Keyboard interrupt. Stopping recording.")
+        print("Keyboard interrupt. Stopping recording.")
         del recorder
 
         if parameters["verbosity_level"]>0:
