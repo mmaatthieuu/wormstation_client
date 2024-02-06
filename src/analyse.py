@@ -1,5 +1,6 @@
 import cv2
 import sys
+import os
 
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
@@ -12,9 +13,10 @@ import pandas as pd
 import numpy as np
 
 class Analyser:
-    def __init__(self, visualization=False):
+    def __init__(self, visualization=False, output_folder=None):
         self.video_path = None
         self.visualization = visualization
+        self.output_folder = output_folder
 
     def compute_chemotaxis(self, video_path):
         #self.logger.log("Computing chemotaxis")
@@ -90,19 +92,43 @@ class Analyser:
         # Remove background
         positions = self.locate_worms(video_path)
 
-        speed_stats, trajectories = self.compute_average_velocity_with_trackpy(positions)
-
         # Compute chemotaxis index
         chemotaxis_data = self.compute_chemotaxis_index(positions, middle)
 
-        # Save data to CSV file
-        self.save_data_to_csv(chemotaxis_data, speed_stats, 'data.csv')
+        speed_stats = None
 
-        #  Plot chemotaxis index
+        # Initial search_range value
+        search_range = 15
+
+        while search_range >= 7:
+            try:
+                # Compute average velocity with trackpy
+                speed_stats, trajectories = self.compute_average_velocity_with_trackpy(positions, search_range)
+                print("Tracking complete.")
+                break  # Break the loop if successful
+
+            except tp.linking.utils.SubnetOversizeException:
+                print(
+                    f"Error: The number of particles is too large for linking. Trying with search_range {search_range - 1}.")
+                search_range -= 1
+
+        # Release the video capture object when done
+        cap.release()
+
+        csv_filename = 'data.csv'
+        if self.output_folder is not None:
+            # Save data to CSV file
+            csv_filename = os.path.join(self.output_folder, 'data.csv')
+
+        # Save data to CSV file
+        self.save_data_to_csv(chemotaxis_data, speed_stats, csv_filename)
+
+        # Plot chemotaxis index
         self.plot_chemotaxis_data(chemotaxis_data)
 
-        # Plot mean speed
-        self.plot_mean_speed(speed_stats)
+        if speed_stats is not None:
+            # Plot mean speed
+            self.plot_mean_speed(speed_stats)
 
 
 
@@ -359,13 +385,13 @@ class Analyser:
 
         return chemotaxis_data_by_frame
 
-    def compute_average_velocity_with_trackpy(self, all_centers_by_frame, frame_rate=2):
+    def compute_average_velocity_with_trackpy(self, all_centers_by_frame, frame_rate=2, search_range=15):
         # Convert the dictionary of centers to a DataFrame compatible with trackpy
         df = pd.DataFrame([(frame, x, y) for frame, centers in all_centers_by_frame.items() for x, y in centers],
                           columns=['frame', 'x', 'y'])
 
         # Use trackpy's link_df to link the points between frames
-        linked_df = tp.link_df(df, search_range=30, memory=3)
+        linked_df = tp.link_df(df, search_range=search_range, memory=3)
 
         # Check if 'particle' column exists in the DataFrame
         if 'particle' not in linked_df.columns:
@@ -549,7 +575,7 @@ class Analyser:
 
         Parameters:
         - chemotaxis_data: Dictionary of chemotaxis data for each frame.
-        - result_df: DataFrame containing mean speed and speed std for each frame.
+        - result_df: DataFrame containing mean speed and speed std for each frame, or None if not available.
         - csv_filename: Name of the CSV file to save.
 
         Example:
@@ -558,19 +584,26 @@ class Analyser:
         """
         with open(csv_filename, 'w', newline='') as csvfile:
             csv_writer = csv.writer(csvfile)
-            csv_writer.writerow(['Frame', 'Chemotaxis Index', 'Mean Speed', 'Speed Std', 'Left Points', 'Right Points',
-                                 'Total Points'])  # Writing header
+            header = ['Frame', 'Chemotaxis Index']
+
+            if result_df is not None:
+                header += ['Mean Speed', 'Speed Std']
+
+            header += ['Left Points', 'Right Points', 'Total Points']
+            csv_writer.writerow(header)  # Writing header
 
             for frame, chemotaxis_info in chemotaxis_data.items():
-                mean_speed_info = result_df[result_df['frame'] == frame].iloc[0]
-                csv_writer.writerow([frame,
-                                     chemotaxis_info['chemotaxis_index'],
-                                     mean_speed_info['mean'],
-                                     mean_speed_info['std'],
-                                     chemotaxis_info['left_points'],
-                                     chemotaxis_info['right_points'],
-                                     chemotaxis_info['total_points']])
+                row = [frame, chemotaxis_info['chemotaxis_index']]
 
+                if result_df is not None:
+                    mean_speed_info = result_df[result_df['frame'] == frame].iloc[0]
+                    row += [mean_speed_info['mean'], mean_speed_info['std']]
+
+                row += [chemotaxis_info['left_points'],
+                        chemotaxis_info['right_points'],
+                        chemotaxis_info['total_points']]
+
+                csv_writer.writerow(row)
 
     def plot_chemotaxis_data(self, chemotaxis_data, frame_rate=2, output_prefix="chemotaxis_plot",
                              font_size=14):
@@ -601,6 +634,10 @@ class Analyser:
         pdf_filename = f"{output_prefix}.pdf"
         png_filename = f"{output_prefix}.png"
 
+        if self.output_folder is not None:
+            pdf_filename = os.path.join(self.output_folder, pdf_filename)
+            png_filename = os.path.join(self.output_folder, png_filename)
+
         plt.savefig(pdf_filename, format='pdf')
         plt.savefig(png_filename, format='png')
 
@@ -629,6 +666,10 @@ class Analyser:
         pdf_filename = f"{output_prefix}.pdf"
         png_filename = f"{output_prefix}.png"
 
+        if self.output_folder is not None:
+            pdf_filename = os.path.join(self.output_folder, pdf_filename)
+            png_filename = os.path.join(self.output_folder, png_filename)
+
         plt.savefig(pdf_filename, format='pdf')
         plt.savefig(png_filename, format='png')
 
@@ -643,7 +684,10 @@ def main():
 
     video_path = sys.argv[1]
 
-    analyser = Analyser()
+    # Set the output folder to be the same folder as the input video
+    output_folder = os.path.dirname(video_path)
+
+    analyser = Analyser(visualization=False, output_folder=output_folder)
 
     analyser.run(video_path)
 
