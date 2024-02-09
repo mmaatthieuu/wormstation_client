@@ -436,6 +436,7 @@ class Recorder:
                 self.logger.log("Deleting local files")
                 subprocess.run(['rm', '-rf', '%s' % folder_name])
                 subprocess.run(['rm', '-rf', '%s.%s' % (folder_name, format)])
+                subprocess.run(['rm', '-rf', '*.png', '*.pdf', '*.csv'])
             except TimeoutError as e:
                 self.logger.log(e)
 
