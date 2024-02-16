@@ -456,6 +456,7 @@ class Recorder:
                 self.logger.log("Deleting local files")
                 subprocess.run(['rm', '-rf', '%s' % folder_name])
                 subprocess.run(['rm', '-rf', '%s.%s' % (folder_name, format)])
+                subprocess.run(['rm', '-rf', '*.png', '*.pdf', '*.csv'])
             except TimeoutError as e:
                 self.logger.log(e)
 
@@ -475,7 +476,7 @@ class Recorder:
         subprocess.run(['rm', '-rf', '%s' % folder_name])
         subprocess.run(['rm', '-rf', '%s.tgz' % folder_name])
 
-    def file_exists_remote(user, host, file_path):
+    def file_exists_remote(self, user, host, file_path):
         command = f'test -e {file_path}'
         result = subprocess.run(['ssh', f'{user}@{host}', command], capture_output=True)
 

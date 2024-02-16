@@ -120,15 +120,24 @@ class Analyser:
             # Save data to CSV file
             csv_filename = os.path.join(self.output_folder, 'data.csv')
 
-        # Save data to CSV file
-        self.save_data_to_csv(chemotaxis_data, speed_stats, csv_filename)
+        try:
+            # Save data to CSV file
+            self.save_data_to_csv(chemotaxis_data, speed_stats, csv_filename)
+        except Exception as e:
+            print(f"Error: Could not save data to CSV file: {e}")
 
-        # Plot chemotaxis index
-        self.plot_chemotaxis_data(chemotaxis_data)
+        try:
+            # Plot chemotaxis index
+            self.plot_chemotaxis_data(chemotaxis_data)
+        except Exception as e:
+            print(f"Error: Could not plot chemotaxis data: {e}")
 
-        if speed_stats is not None:
-            # Plot mean speed
-            self.plot_mean_speed(speed_stats)
+        try:
+            if speed_stats is not None:
+                # Plot mean speed
+                self.plot_mean_speed(speed_stats)
+        except Exception as e:
+            print(f"Error: Could not plot mean speed: {e}")
 
 
 
