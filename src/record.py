@@ -34,6 +34,19 @@ from src.log import Logger
 
 from src.analyse import Analyser
 
+'''
+Verbosity levels:
+0: No log
+1: Only errors
+2: Errors and warnings
+3: Errors, warnings and info
+4: Errors, warnings, info and debug
+5: Errors, warnings, info, debug and trace
+6: Errors, warnings, info, debug, trace and verbose
+7: Errors, warnings, info, debug, trace, verbose and very verbose
+8: Errors, warnings, info, debug, trace, verbose, very verbose and ultra verbose
+'''
+
 class Recorder:
     """
     Class Recorder
@@ -44,6 +57,13 @@ class Recorder:
         """
         # Get parameter as argument or create new instance that load json ??
         self.parameters = parameters
+
+        self.logger = Logger(verbosity_level=parameters["verbosity_level"], save_log=self.is_it_useful_to_save_logs())
+
+        self.logger.log("Initializing recorder", log_level=5)
+
+        # Log parameters
+        self.logger.log(json.dumps(self.parameters, indent=4))
 
         # Remark : the directory is created on the NAS before initializing the camera
         # If the camera is initialized first, it produces only black frames...
@@ -57,7 +77,7 @@ class Recorder:
         # Create the camera object with the input parameters
         self.camera = Camera(parameters=self.parameters)
 
-        self.logger = Logger(verbosity_level=parameters["verbosity_level"], save_log=self.is_it_useful_to_save_logs())
+
 
         self.current_frame = None
 
@@ -98,7 +118,7 @@ class Recorder:
         self.save_process = None
 
     def __del__(self):
-        self.logger.log("Closing recorder")
+        self.logger.log("Closing recorder", log_level=3)
         #subprocess.run(['pkill', 'cpulimit'])
         del self.camera
 
@@ -122,7 +142,7 @@ class Recorder:
 
         # Compute the total number of frame from the recording time and time interval between frames
 
-        self.logger.log(json.dumps(self.parameters, indent=4))
+
 
         self.camera.pre_callback = self.annotate_frame
 
