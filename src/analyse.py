@@ -18,59 +18,6 @@ class Analyser:
         self.visualization = visualization
         self.output_folder = output_folder
 
-    def compute_chemotaxis(self, video_path):
-        #self.logger.log("Computing chemotaxis")
-
-        print("Use run() instead. Exiting.")
-        return
-
-        print(f"Computing chemotaxis for {video_path}")
-        self.video_path = video_path
-        # self.logger.log("Starting compression of %s" % folder_name)
-
-        # Call the load_video function
-        cap, width, height = self.load_video(video_path)
-
-        # Read the first frame
-        ret, first_frame = cap.read()
-        first_frame = self.get_specific_frame(video_path, 3)
-
-        if not ret:
-            print("Error: Could not read the first frame.")
-            return
-
-        # Detect edges in the first frame
-        # edges = detect_petri_edges(first_frame)
-
-        # Detect circles
-        # detected_circles = detect_circles(edges)
-
-        # Save the first frame with detected circles
-        # draw_circles(first_frame, detected_circles)
-
-        # get middle of the image width
-        middle = int(width / 2)
-
-        # Remove background
-        positions = self.locate_worms(video_path)
-
-        # Compute chemotaxis index
-        chemotaxis_index_by_frame = self.compute_chemotaxis_index(positions, middle)
-
-        # Save centers of mass to CSV file
-        # save_centers_to_csv(positions, 'centers.csv')
-
-        # Save chemotaxis indices to CSV file
-        self.save_chemotaxis_indices_to_csv(chemotaxis_index_by_frame, 'data.csv')
-
-        # Plot chemotaxis index
-        self.plot_chemotaxis_index(chemotaxis_index_by_frame)
-
-        # Release the video capture object when done
-        cap.release()
-
-        return positions
-
     def run(self, video_path):
         #self.logger.log("Running analysis")
         print(f"Running analysis for {video_path}")
@@ -121,10 +68,10 @@ class Analyser:
 
         output_files = []
 
-        csv_filename = 'data.csv'
+        csv_filename = f'{video_name}_data.csv'
         if self.output_folder is not None:
             # Save data to CSV file
-            csv_filename = os.path.join(self.output_folder, f'{video_name}_data.csv')
+            csv_filename = os.path.join(self.output_folder, csv_filename)
 
         try:
             # Save data to CSV file
