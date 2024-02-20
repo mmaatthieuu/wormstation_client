@@ -549,26 +549,34 @@ class Recorder:
         return True
 
     def sshupload(self, file_to_upload, filename_at_destination=""):
-        #print("sshupload")
+        # print("sshupload")
         if file_to_upload is not None:
             user = os.getlogin()
 
-            #print(f'scp {file_to_upload} {user}@{self.parameters["ssh_destination"]}:{self.ssh_output}/{filename_at_destination}')
+            # print(f'scp {file_to_upload} {user}@{self.parameters["ssh_destination"]}:{self.ssh_output}/{filename_at_destination}')
 
-            ok = subprocess.run(
-                ['scp',
-                 file_to_upload,
-                 f'{user}@{self.parameters["ssh_destination"]}:{self.ssh_output}/{filename_at_destination}'],
-                capture_output=False)
+            ok = False
+            try:
+                ok = subprocess.run(
+                    ['scp',
+                     file_to_upload,
+                     f'{user}@{self.parameters["ssh_destination"]}:{self.ssh_output}/{filename_at_destination}'],
+                    capture_output=False,
+                    timeout=0.5)  # Timeout set to 0.5 seconds
 
-            extension = pathlib.Path(file_to_upload).suffix
+                extension = pathlib.Path(file_to_upload).suffix
 
-            if ok and extension == ".tgz":
-                #print(ok)
-                try:
-                    os.remove(file_to_upload)
-                except OSError as e:
-                    self.logger.log("Error: %s - %s." % (e.filename, e.strerror))
+                if ok and extension == ".tgz":
+                    # print(ok)
+                    try:
+                        os.remove(file_to_upload)
+                    except OSError as e:
+                        self.logger.log("Error: %s - %s." % (e.filename, e.strerror))
+
+            except TimeoutExpired:
+                self.logger.log(f'Timeout expired while uploading file: {file_to_upload}', begin="\n    ERROR    ", end="\n\n", log_level=1)
+            except Exception as e:
+                self.logger.log(e)
 
             return ok
         return True
