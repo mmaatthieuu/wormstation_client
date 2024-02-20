@@ -78,6 +78,10 @@ class Analyser:
         # Call the load_video function
         cap, width, height = self.load_video(video_path)
 
+        # Get video name without the extension
+        video_name = os.path.basename(video_path)
+        video_name = os.path.splitext(video_name)[0]
+
         # Read the first frame
         ret, first_frame = cap.read()
         first_frame = self.get_specific_frame(video_path, 3)
@@ -115,29 +119,37 @@ class Analyser:
         # Release the video capture object when done
         cap.release()
 
+        output_files = []
+
         csv_filename = 'data.csv'
         if self.output_folder is not None:
             # Save data to CSV file
-            csv_filename = os.path.join(self.output_folder, 'data.csv')
+            csv_filename = os.path.join(self.output_folder, f'{video_name}_data.csv')
 
         try:
             # Save data to CSV file
-            self.save_data_to_csv(chemotaxis_data, speed_stats, csv_filename)
+            csv_files = self.save_data_to_csv(chemotaxis_data, speed_stats, csv_filename)
+            output_files.extend(csv_files)
         except Exception as e:
             print(f"Error: Could not save data to CSV file: {e}")
 
         try:
             # Plot chemotaxis index
-            self.plot_chemotaxis_data(chemotaxis_data)
+            chemo_plots = self.plot_chemotaxis_data(chemotaxis_data, output_prefix=f"{video_name}_chemotaxis",)
+            output_files.extend(chemo_plots)
         except Exception as e:
             print(f"Error: Could not plot chemotaxis data: {e}")
 
         try:
             if speed_stats is not None:
                 # Plot mean speed
-                self.plot_mean_speed(speed_stats)
+                speed_pltos = self.plot_mean_speed(speed_stats, output_prefix=f"{video_name}_mean_speed")
+                output_files.extend(speed_pltos)
         except Exception as e:
             print(f"Error: Could not plot mean speed: {e}")
+
+        # return the list of created files
+        return output_files
 
 
 
@@ -614,6 +626,9 @@ class Analyser:
 
                 csv_writer.writerow(row)
 
+        # return the list of created files
+        return [csv_filename]
+
     def plot_chemotaxis_data(self, chemotaxis_data, frame_rate=2, output_prefix="chemotaxis_plot",
                              font_size=14):
         # Extract frame indices
@@ -650,6 +665,9 @@ class Analyser:
         plt.savefig(pdf_filename, format='pdf')
         plt.savefig(png_filename, format='png')
 
+        # return the list of created files
+        return [pdf_filename, png_filename]
+
     def plot_mean_speed(self, result_df, output_prefix="mean_speed_plot", font_size=14):
         # Plot mean speed against frame number
         plt.figure(figsize=(10, 6))
@@ -685,6 +703,9 @@ class Analyser:
         if self.visualization:
             # Display the plot
             plt.show()
+
+        # return the list of created files
+        return [pdf_filename, png_filename]
 
 def main():
     if len(sys.argv) != 2:

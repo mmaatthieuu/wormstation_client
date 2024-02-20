@@ -422,9 +422,10 @@ class Recorder:
         compressed_file = self.compress(folder_name=folder_name, format=format)
 
         analyser = Analyser()
+        output_files = []
 
         if self.parameters["compute_chemotaxis"]:
-            analyser.run(video_path=compressed_file)
+            output_files = analyser.run(video_path=compressed_file)
 
         if self.parameters["use_samba"] is True or self.parameters["use_ssh"] is True:
             file_to_upload = compressed_file
@@ -440,11 +441,8 @@ class Recorder:
                     elif self.parameters["use_ssh"]:
                         ok = self.sshupload(file_to_upload=file_to_upload)
                         if self.parameters["compute_chemotaxis"]:
-                            ok = self.sshupload(file_to_upload="data.csv")
-                            ok = self.sshupload(file_to_upload="chemotaxis_plot.png")
-                            ok = self.sshupload(file_to_upload="chemotaxis_plot.pdf")
-                            ok = self.sshupload(file_to_upload="mean_speed_plot.png")
-                            ok = self.sshupload(file_to_upload="mean_speed_plot.pdf")
+                            for file in output_files:
+                                ok = self.sshupload(file_to_upload=file)
                     n_trials = n_trials+1
 
                     if n_trials > 5:
@@ -456,7 +454,10 @@ class Recorder:
                 self.logger.log("Deleting local files")
                 subprocess.run(['rm', '-rf', '%s' % folder_name])
                 subprocess.run(['rm', '-rf', '%s.%s' % (folder_name, format)])
-                subprocess.run(['rm', '-rf', '*.png', '*.pdf', '*.csv'])
+
+                for file in output_files:
+                    subprocess.run(['rm', '-rf', file])
+
             except TimeoutError as e:
                 self.logger.log(e)
 
