@@ -24,6 +24,9 @@ class Logger:
 
 
     def log(self, log_msg, begin="", end="\n", log_level=None):
+
+        # TODO: Add prefix to log messages, like [ERROR], [WARNING], [INFO], [DEBUG], [TRACE], [VERBOSE]
+
         if log_level is None: log_level=self.verbosity_level
         if log_level <= self.verbosity_level:
             string = f'{begin}[{str(dt.datetime.now())}] : {log_msg}'

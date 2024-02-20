@@ -27,6 +27,7 @@ from src.led_controller import LED
 # from src.tlc5940.tlc import tlc5940
 import os
 import subprocess
+from subprocess import TimeoutExpired
 from pathlib import Path
 
 import src.NPImage as npi
@@ -116,6 +117,8 @@ class Recorder:
         # TODO pool instead of single process
         self.compress_process = None
         self.save_process = None
+
+        self.logger.log("Recorder initialized", log_level=5)
 
     def __del__(self):
         self.logger.log("Closing recorder", log_level=3)
@@ -571,6 +574,7 @@ class Recorder:
         return True
 
     def create_tree_structure(self, protocol):
+        self.logger.log(f"Creating tree structure with {protocol} protocol", log_level=5)
         try:
             folder1 = f'{(datetime.now()).strftime("%Y%m%d_%H%M")}_{self.parameters["recording_name"]}'
         except:
@@ -581,6 +585,8 @@ class Recorder:
             self.smbcommand(command=f'mkdir {folder1}', working_dir=self.parameters["smb_dir"])
             self.smbcommand(command=f'mkdir {folder1}/{folder2}', working_dir=self.parameters["smb_dir"])
 
+            self.logger.log(f'Created folder {folder1}/{folder2} in {self.parameters["smb_dir"]}', log_level=5)
+
             return f'{self.parameters["smb_dir"]}/{folder1}/{folder2}'
         if protocol == "ssh":
             user = os.getlogin()
@@ -588,6 +594,8 @@ class Recorder:
             print(command)
             #self.sshcommand(command=f'mkdir {folder1}', working_dir=self.parameters["ssh_dir"])
             self.sshcommand(command=command)
+
+            self.logger.log(f'Created folder {folder1}/{folder2} in {self.parameters["ssh_dir"]}', log_level=5)
 
             return f'{self.parameters["ssh_dir"]}/{folder1}/{folder2}'
 
@@ -616,15 +624,25 @@ class Recorder:
 
         ok = False
         try:
-            print(f'ssh {user}@{self.parameters["ssh_destination"]} "{command}"')
+            self.logger.log(f'Executing command : {command}', log_level=1)
+            self.logger.log(f'Running command : ssh {user}@{self.parameters["ssh_destination"]} {command}', log_level=5)
 
             ok = subprocess.run(
                 ['ssh',
                  f'{user}@{self.parameters["ssh_destination"]}',
                  command],
-                capture_output=False)
+                capture_output=False,
+                timeout=0.5)  # Timeout set to 0.5 seconds
 
+            self.logger.log(f'Subprocess return code : {ok.returncode}', log_level=5)
 
+        except TimeoutExpired:
+            self.logger.log(f'Timeout expired while executing command: {command}', log_level=1)
+            self.logger.log(f'Maybe try to first connect to the server with ssh'
+                            f'{user}@{self.parameters["ssh_destination"]}', log_level=1)
+
+            self.logger.log(f'ERROR: output folder not accessible', begin="\n    ERROR    ", end="\n\n", log_level=1)
+            return False
         except Exception as e:
             self.logger.log(e)
         return ok
