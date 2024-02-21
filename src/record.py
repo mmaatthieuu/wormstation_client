@@ -612,6 +612,10 @@ class Recorder:
 
             # Calculate the network speed
             network_speed = psutil.net_io_counters().bytes_sent / (1024 * (time.time() - start_time))
+
+            # Log the network speed
+            self.logger.log(f'Network speed: {network_speed:.2f} KB/s', log_level=5)
+
             # Check if the network speed is less than 1 KB/s and more than 10 seconds have passed
             if network_speed < 1 and time.time() - start_time > 10:
                 # Log an error message and terminate the process if the conditions are met

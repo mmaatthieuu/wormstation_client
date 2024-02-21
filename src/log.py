@@ -38,7 +38,6 @@ class Logger:
                     #log_file.write(string)
 
     def init_path(self, save_log, recording_name):
-
         # if save_log is True, create a log file in the user's home directory
         if save_log:
             path = f"/home/{os.getlogin()}/log"
@@ -53,6 +52,14 @@ class Logger:
                 path = f'{path}/log_{dt.datetime.now().strftime("%Y%m%d_%H%M")}.out'
             else:
                 path = f'{path}/log_{dt.datetime.now().strftime("%Y%m%d_%H%M")}_{recording_name}.out'
+
+            # Create a symbolic link called last_recording.out pointing towards the current log file
+            symlink_path = f'/home/{os.getlogin()}/log/last_recording.out'
+            try:
+                os.symlink(path, symlink_path)
+            except FileExistsError:
+                os.remove(symlink_path)
+                os.symlink(path, symlink_path)
         else:
             path = None
 
