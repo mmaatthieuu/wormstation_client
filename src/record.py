@@ -549,29 +549,42 @@ class Recorder:
         return True
 
     def sshupload(self, file_to_upload, filename_at_destination=""):
+        # Check if file_to_upload is not None
         if file_to_upload is not None:
+            # Get the current user's login name
             user = os.getlogin()
+            # Start the scp process
             process = self.start_scp_process(file_to_upload, filename_at_destination, user)
 
+            # Check if the process was successfully started
             if process:
+                # Monitor network speed while the process is running
                 self.monitor_network_speed(process)
+                # Communicate with the process and get stdout and stderr
                 stdout, stderr = process.communicate()
+                # Check the return code of the process
                 if process.returncode != 0:
-                    self.logger.log(f'Error occurred during scp: {stderr}', begin="\n    ERROR    ", end="\n\n",
-                                    log_level=1)
+                    # Log an error message if the process returned a non-zero code
+                    self.logger.log(f'Error occurred during scp: {stderr}', begin="\n    ERROR    ", end="\n\n", log_level=1)
                     return False
 
+                # Check if the file has a .tgz extension
                 extension = pathlib.Path(file_to_upload).suffix
                 if extension == ".tgz":
+                    # Remove the uploaded file if it has a .tgz extension
                     self.remove_uploaded_file(file_to_upload)
 
+                # Return True if the process completed successfully
                 return True
             else:
+                # Return False if the process failed to start
                 return False
+        # Return True if file_to_upload is None
         return True
 
     def start_scp_process(self, file_to_upload, filename_at_destination, user):
         try:
+            # Start the scp process using subprocess.Popen
             process = subprocess.Popen(
                 ['scp',
                  file_to_upload,
@@ -579,33 +592,43 @@ class Recorder:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE
             )
+            # Return the process object if successful
             return process
         except Exception as e:
-            self.logger.log(f'Error occurred while starting scp process: {e}', begin="\n    ERROR    ", end="\n\n",
-                            log_level=1)
+            # Log an error message if an exception occurs
+            self.logger.log(f'Error occurred while starting scp process: {e}', begin="\n    ERROR    ", end="\n\n", log_level=1)
+            # Return None if an exception occurs
             return None
 
     def monitor_network_speed(self, process):
+        # Get the start time
         start_time = time.time()
+        # Loop indefinitely
         while True:
             # Check if the process is still running
             if process.poll() is not None:
+                # Break the loop if the process has terminated
                 break
 
-            # Check network speed
+            # Calculate the network speed
             network_speed = psutil.net_io_counters().bytes_sent / (1024 * (time.time() - start_time))
+            # Check if the network speed is less than 1 KB/s and more than 10 seconds have passed
             if network_speed < 1 and time.time() - start_time > 10:
-                self.logger.log(f'Network speed is less than 1 KB/s for more than 10 seconds. Stopping process.',
-                                begin="\n    ERROR    ", end="\n\n", log_level=1)
+                # Log an error message and terminate the process if the conditions are met
+                self.logger.log(f'Network speed is less than 1 KB/s for more than 10 seconds. Stopping process.', begin="\n    ERROR    ", end="\n\n", log_level=1)
                 process.terminate()
+                # Break the loop
                 break
 
-            time.sleep(0.1)  # Sleep for 0.1 seconds before checking again
+            # Sleep for 0.1 seconds before checking again
+            time.sleep(0.1)
 
     def remove_uploaded_file(self, file_to_upload):
         try:
+            # Remove the uploaded file using os.remove
             os.remove(file_to_upload)
         except OSError as e:
+            # Log an error message if an exception occurs
             self.logger.log("Error: %s - %s." % (e.filename, e.strerror))
 
     def create_tree_structure(self, protocol):
