@@ -562,7 +562,9 @@ class Recorder:
                      file_to_upload,
                      f'{user}@{self.parameters["ssh_destination"]}:{self.ssh_output}/{filename_at_destination}'],
                     capture_output=False,
-                    timeout=0.5)  # Timeout set to 0.5 seconds
+                    timeout=60)  # Timeout set to 60 seconds
+
+                # TODO : handle the case where the file is not uploaded by checking network activity
 
                 extension = pathlib.Path(file_to_upload).suffix
 
