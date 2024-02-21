@@ -1,5 +1,7 @@
 import datetime as dt
 import os
+import sys
+from tqdm import tqdm
 
 class Logger:
     def __init__(self, verbosity_level, save_log=False, recording_name=None):
@@ -22,20 +24,39 @@ class Logger:
         8: Errors, warnings, info, debug, trace, verbose, very verbose and ultra verbose
         '''
 
-
     def log(self, log_msg, begin="", end="\n", log_level=None):
 
-        # TODO: Add prefix to log messages, like [ERROR], [WARNING], [INFO], [DEBUG], [TRACE], [VERBOSE]
+        # Define log level prefixes
+        log_level_prefixes = {
+            0: "[NO LOG]",
+            1: "[ERROR]",
+            2: "[WARNING]",
+            3: "[INFO]",
+            4: "[DEBUG]",
+            5: "[TRACE]",
+            6: "[VERBOSE]",
+            7: "[VERY VERBOSE]",
+            8: "[ULTRA VERBOSE]"
+        }
 
-        if log_level is None: log_level=self.verbosity_level
-        if log_level <= self.verbosity_level:
-            string = f'{begin}[{str(dt.datetime.now())}] : {log_msg}'
-            if self.path is None:
-                print(string, end=end)
-            else:
-                with open(self.path, 'a') as log_file:
-                    print(string, end=end, file=log_file)
-                    #log_file.write(string)
+        # Set default log level if not provided
+        if log_level is None:
+            log_level = self.verbosity_level
+
+        # Check if the log level is valid
+        if log_level not in log_level_prefixes:
+            raise ValueError(f"Invalid log level: {log_level}")
+
+        # Construct the log message with the prefix
+        log_prefix = log_level_prefixes[log_level]
+        string = f'{begin}[{str(dt.datetime.now())}] {log_prefix} : {log_msg}'
+
+        # Write the log message to the appropriate output
+        if self.path is None:
+            print(string, end=end)
+        else:
+            with open(self.path, 'a') as log_file:
+                print(string, end=end, file=log_file)
 
     def init_path(self, save_log, recording_name):
         # if save_log is True, create a log file in the user's home directory

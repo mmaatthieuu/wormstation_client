@@ -424,7 +424,7 @@ class Recorder:
         #self.logger.log("start compression")
         compressed_file = self.compress(folder_name=folder_name, format=format)
 
-        analyser = Analyser()
+        analyser = Analyser(logger=self.logger)
         output_files = []
 
         if self.parameters["compute_chemotaxis"]:
@@ -437,7 +437,7 @@ class Recorder:
             n_trials = 0
             try:
                 while self.upload_failed(file_to_upload):
-                    self.logger.log("Uploading...")
+                    self.logger.log("Uploading...", log_level=3)
                     print(f"#DEBUG uploading {file_to_upload}, trial {n_trials}")
                     if self.parameters["use_samba"]:
                         ok = self.smbupload(file_to_upload=file_to_upload)
@@ -686,7 +686,7 @@ class Recorder:
 
         ok = False
         try:
-            self.logger.log(f'Executing command : {command}', log_level=1)
+            self.logger.log(f'Executing command : {command}', log_level=5)
             self.logger.log(f'Running command : ssh {user}@{self.parameters["ssh_destination"]} {command}', log_level=5)
 
             ok = subprocess.run(
