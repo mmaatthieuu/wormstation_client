@@ -28,7 +28,7 @@ class Logger:
 
         # Define log level prefixes
         log_level_prefixes = {
-            0: "[NO LOG]",
+            0: "",
             1: "[ERROR]",
             2: "[WARNING]",
             3: "[INFO]",

@@ -64,7 +64,7 @@ class Recorder:
         self.logger.log("Initializing recorder", log_level=5)
 
         # Log parameters
-        self.logger.log(json.dumps(self.parameters, indent=4))
+        self.logger.log(json.dumps(self.parameters, indent=4), log_level=0)
 
         # Remark : the directory is created on the NAS before initializing the camera
         # If the camera is initialized first, it produces only black frames...
