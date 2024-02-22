@@ -268,6 +268,7 @@ class Recorder:
 
                 # print(f'end: {datetime.now() - self.initial_datetime}')
 
+        self.logger.log("Recording done (Timeout reached)", log_level=3)
         ## DEBUG
         # avg_time = avg_time / float(self.n_frames_total)
         #
