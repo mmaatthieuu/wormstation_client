@@ -430,6 +430,7 @@ class Recorder:
 
         if self.parameters["compute_chemotaxis"]:
             output_files = analyser.run(video_path=compressed_file)
+            self.logger.log(f"Output files : {output_files}", log_level=5)
 
         if self.parameters["use_samba"] is True or self.parameters["use_ssh"] is True:
             file_to_upload = compressed_file
