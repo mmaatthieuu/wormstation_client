@@ -549,6 +549,9 @@ class Recorder:
         return True
 
     def sshupload(self, file_to_upload, filename_at_destination=""):
+
+        self.logger.log(f'Uploading {file_to_upload} to {self.parameters["ssh_destination"]}:{self.ssh_output}/{filename_at_destination}', log_level=5)
+
         # Check if file_to_upload is not None
         if file_to_upload is not None:
             # Get the current user's login name
