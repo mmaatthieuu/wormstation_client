@@ -33,12 +33,12 @@ class LED():
             self.program.join()
 
     def turn_on(self):
-        self.logger.log(f'Turning on {self.name} LED')
+        self.logger.log(f'Turning on {self.name} LED', log_level=5)
         GPIO.output(self.gpio_pin, GPIO.HIGH)
         self.is_on = True
 
     def turn_off(self):
-        self.logger.log(f'Turning off {self.name} LED')
+        self.logger.log(f'Turning off {self.name} LED', log_level=5)
         GPIO.output(self.gpio_pin, GPIO.LOW)
         self.is_on = False
 
