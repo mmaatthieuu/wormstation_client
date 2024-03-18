@@ -6,7 +6,7 @@ import psutil
 from datetime import datetime
 
 class LED():
-    def __init__(self, _control_gpio_pin):
+    def __init__(self, _control_gpio_pin, logger=None, name=None):
         GPIO.setwarnings(False)
         self.gpio_pin = _control_gpio_pin
         self.is_on = None
@@ -15,6 +15,9 @@ class LED():
         GPIO.setup(self.gpio_pin, GPIO.OUT)
 
         self.program = None
+
+        self.logger = logger
+        self.name = name
 
         #self.turn_off()
 
@@ -30,10 +33,12 @@ class LED():
             self.program.join()
 
     def turn_on(self):
+        self.logger.log(f'Turning on {self.name} LED')
         GPIO.output(self.gpio_pin, GPIO.HIGH)
         self.is_on = True
 
     def turn_off(self):
+        self.logger.log(f'Turning off {self.name} LED')
         GPIO.output(self.gpio_pin, GPIO.LOW)
         self.is_on = False
 

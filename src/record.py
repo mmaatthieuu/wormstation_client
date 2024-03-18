@@ -6,9 +6,6 @@ from PIL import Image as im
 
 from .utils import *
 
-
-
-
 # import picamera
 import json
 from picamera2 import MappedArray
@@ -16,7 +13,7 @@ import cv2
 
 from math import log10, ceil
 
-#from threading import Thread, Lock
+# from threading import Thread, Lock
 import multiprocessing
 
 import psutil
@@ -48,10 +45,12 @@ Verbosity levels:
 8: Errors, warnings, info, debug, trace, verbose, very verbose and ultra verbose
 '''
 
+
 class Recorder:
     """
     Class Recorder
     """
+
     def __init__(self, parameters, git_version):
         """
         Constructor
@@ -74,17 +73,14 @@ class Recorder:
         elif self.parameters["use_ssh"]:
             self.ssh_output = self.create_tree_structure("ssh")
 
-
         # Create the camera object with the input parameters
         self.camera = Camera(parameters=self.parameters)
-
-
 
         self.current_frame = None
 
         self.pause_mode = self.get_pause_mode()
-        self.pause_number=0
-        self.pause_time = self.parameters["record_every_h"]*3600 - self.parameters["record_for_s"]
+        self.pause_number = 0
+        self.pause_time = self.parameters["record_every_h"] * 3600 - self.parameters["record_for_s"]
 
         self.current_frame_number = 0
         self.number_of_skipped_frames = 0
@@ -96,23 +92,21 @@ class Recorder:
 
         self.output_filename = self.read_output_filename()
 
-        self.initial_time = 0 # will be redefined at the beginning of recording
-        #self.delay = 0
+        self.initial_time = 0  # will be redefined at the beginning of recording
+        # self.delay = 0
         self.start_time_current_frame = 0
 
         self.optogenetic = self.parameters["optogenetic"]
         self.pulse_duration = self.parameters["pulse_duration"]
         self.pulse_interval = self.parameters["pulse_interval"]
 
-
-
         self.git_version = git_version
 
-        self.leds = LED(_control_gpio_pin=17)
+        self.leds = LED(_control_gpio_pin=17, logger=self.logger, name="IR")
         if self.optogenetic:
-            self.opto_leds = LED(_control_gpio_pin=18)
+            self.opto_leds = LED(_control_gpio_pin=18, logger=self.logger, name="OG")
 
-        #subprocess.run(['cpulimit', '-P', '/usr/bin/gzip', '-l', '10', '-b', '-q'])
+        # subprocess.run(['cpulimit', '-P', '/usr/bin/gzip', '-l', '10', '-b', '-q'])
 
         # TODO pool instead of single process
         self.compress_process = None
@@ -122,7 +116,7 @@ class Recorder:
 
     def __del__(self):
         self.logger.log("Closing recorder", log_level=3)
-        #subprocess.run(['pkill', 'cpulimit'])
+        # subprocess.run(['pkill', 'cpulimit'])
         del self.camera
 
         # if not self.preview_only():
@@ -145,8 +139,6 @@ class Recorder:
 
         # Compute the total number of frame from the recording time and time interval between frames
 
-
-
         self.camera.pre_callback = self.annotate_frame
 
         self.camera.start()
@@ -154,7 +146,6 @@ class Recorder:
         if not self.preview_only():
             # If one does an actual recording and not just a preview (i.e. timeout=0)
             # sync all raspberry pi by acquiring frames every even second
-
 
             # self.leds.start_program_in_seconds(duration_of_illumination=self.parameters["illumination_pulse"]/1000,
             #                                    period=self.parameters["time_interval"],
@@ -177,7 +168,7 @@ class Recorder:
                                          period=self.parameters["pulse_interval"],
                                          timeout=self.parameters["timeout"])
 
-        #self.create_output_folder()
+        # self.create_output_folder()
 
         # Main recording loop
         for self.current_frame_number in range(self.parameters["start_frame"], self.n_frames_total):
@@ -185,17 +176,17 @@ class Recorder:
             # print(f'frame {self.current_frame_number}')
 
             if self.is_it_pause_time(self.current_frame_number):
-                #pause_time = self.parameters["record_every_h"]*60 - self.parameters["record_for_s"]
+                # pause_time = self.parameters["record_every_h"]*60 - self.parameters["record_for_s"]
                 self.pause_recording_in_s(self.pause_time)
 
             # (Re)Initialize the current frame
-            #self.current_frame = np.empty((3040, 4056, 3), dtype=np.uint8)
+            # self.current_frame = np.empty((3040, 4056, 3), dtype=np.uint8)
 
             # If in advance, wait, otherwise skip frames
             self.wait_or_catchup_by_skipping_frames()
 
             self.start_time_current_frame = time.time()
-            #print(f'frame {self.current_frame_number} start: {self.start_time_current_frame - self.initial_time}')
+            # print(f'frame {self.current_frame_number} start: {self.start_time_current_frame - self.initial_time}')
 
             try:
                 if not self.skip_frame:
@@ -206,11 +197,10 @@ class Recorder:
 
                     self.capture_frame()
 
-
                     ### From the documentation :
                     '''
                     https://datasheets.raspberrypi.com/camera/picamera2-manual.pdf
-                    
+
                     Moving processing out of the camera thread
                     Normally when we use a function like Picamera2.capture_file, 
                     the processing to capture the image, compress it as (for
@@ -220,12 +210,12 @@ class Recorder:
                     some frames. In many cases this is not terribly
                     important, but there are occasions when we might prefer all the 
                     processing to happen somewhere else.
-                    
+
                     Just as an example, if we were recording a video and wanted to capture
                      a JPEG simultaneously whilst minimising the
                     risk of dropping any video frames, then it would be beneficial 
                     to move that processing out of the camera loop.
-                    
+
                     This is easily accomplished simply by capturing a request and calling
                      request.save as we saw above. Camera events can
                     still be handled in parallel (though this is somewhat at the mercy of 
@@ -246,25 +236,23 @@ class Recorder:
 
             finally:
 
-                #TODO : write doc about why this check is useful
+                # TODO : write doc about why this check is useful
                 if self.get_last_save_path() is not None:
                     # new process for saving
                     # self.save_process = multiprocessing.Process(target=self.save_frame)
                     # self.save_process.start()
-                    #self.save_frame()
+                    # self.save_frame()
 
                     if self.is_time_for_compression():
-                        #self.logger.log("time for compression")
+                        # self.logger.log("time for compression")
                         self.logger.log("time for compression")
                         self.start_async_compression_and_upload(format="mkv")
 
                     if self.parameters["use_samba"] and self.is_it_useful_to_save_logs():
                         self.async_smbupload(file_to_upload=self.logger.get_log_file_path(),
                                              filename_at_destination=self.logger.get_log_filename())
-                #create link to last frame
+                # create link to last frame
                 self.create_symlink_to_last_frame()
-
-
 
                 # print(f'end: {datetime.now() - self.initial_datetime}')
 
@@ -287,8 +275,6 @@ class Recorder:
 
         delay = self.get_delay()
 
-
-
         # print(f'current time - initial time : {time.time() - self.initial_time}')
         # print(f'1- {self.current_frame_number * self.parameters["time_interval"]}')
         # print(f'2- {self.pause_number * self.pause_time/self.parameters["time_interval"]}')
@@ -297,7 +283,7 @@ class Recorder:
         # print(f'delay : {delay}')
 
         # If too early, wait until it is time to record
-        #print(delay)
+        # print(delay)
         # print(f'current: {current_timedelta}, exp: {expected_timedelta_for_current_frame}, delay: {delay}')
         if delay < 0:
             try:
@@ -308,7 +294,7 @@ class Recorder:
             if self.parameters["verbosity_level"] >= 2:
                 self.logger.log("Waiting for %fs" % -delay)
         elif delay < 0.005:  # We need some tolerance in this world...
-            pass # And go on directly with frame capture
+            pass  # And go on directly with frame capture
         else:
             # Frame late : log delay
             if self.parameters["verbosity_level"] >= 1:
@@ -323,7 +309,6 @@ class Recorder:
                 self.current_frame_number < (self.n_frames_total - 1) and self.pause_mode is False:
             self.skip_frame = True
             self.logger.log(f"Delay too long : Frame {self.current_frame_number} skipped", begin="\n    WARNING    ")
-
 
     def get_delay(self):
         delay = 0
@@ -348,7 +333,6 @@ class Recorder:
             self.logger.log(f"Starting capture of frame {self.current_frame_number + 1} "
                             f"/ {self.n_frames_total}", begin="\r", end="")
 
-
     def annotate_frame(self, request):
         if self.parameters["annotate_frames"]:
 
@@ -371,8 +355,6 @@ class Recorder:
                 # not a picam2 request
                 return cv2.putText(request, string_to_overlay, origin, font, scale, colour, thickness)
 
-
-
     def save_frame(self):
         """
         Convert numpy array to image and save it locally
@@ -390,11 +372,10 @@ class Recorder:
         # the picture is in portrait mode rather than landscape.
         # The +(3,) is used to append 3 (i.e. the number of RGB channels) to create a RGB image
 
-        zero_array = np.zeros((self.camera.camera_properties["PixelArraySize"])[::-1]+(3,), dtype=np.uint8)
+        zero_array = np.zeros((self.camera.camera_properties["PixelArraySize"])[::-1] + (3,), dtype=np.uint8)
         zero_array = self.annotate_frame(zero_array)
         image = im.fromarray(zero_array)
         image.save(path)
-
 
     def is_time_for_compression(self):
         """
@@ -411,18 +392,17 @@ class Recorder:
         except ZeroDivisionError as e:
             return False
 
-
     def start_async_compression_and_upload(self, format):
         dir_to_compress = self.get_current_dir()
         self.logger.log("Dir_to_compress : %s" % dir_to_compress)
-        #log("Dest path : %s " % output_folder)
-        #self.save_process.join()
+        # log("Dest path : %s " % output_folder)
+        # self.save_process.join()
         self.compress_process = multiprocessing.Process(target=self.compress_and_upload,
                                                         args=(dir_to_compress, format,))
         self.compress_process.start()
 
     def compress_and_upload(self, folder_name, format):
-        #self.logger.log("start compression")
+        # self.logger.log("start compression")
         compressed_file = self.compress(folder_name=folder_name, format=format)
 
         analyser = Analyser(logger=self.logger)
@@ -448,14 +428,14 @@ class Recorder:
                         if self.parameters["compute_chemotaxis"]:
                             for file in output_files:
                                 ok = self.sshupload(file_to_upload=file)
-                    n_trials = n_trials+1
+                    n_trials = n_trials + 1
 
                     if n_trials > 5:
                         print(f"#DEBUG ulpoad failed {n_trials} times")
                         raise TimeoutError("Uplaod failed")
 
                 self.logger.log("Upload successful")
-                #TODO : Maybe add check on NAS to confirm sucessful upload
+                # TODO : Maybe add check on NAS to confirm sucessful upload
                 self.logger.log("Deleting local files")
                 subprocess.run(['rm', '-rf', '%s' % folder_name])
                 subprocess.run(['rm', '-rf', '%s.%s' % (folder_name, format)])
@@ -466,17 +446,14 @@ class Recorder:
             except TimeoutError as e:
                 self.logger.log(e)
 
-
                 # TODO : handle files that have not been uploaded
-            #subprocess.run(['rm', '-rf', '%s.tgz' % folder_name])
-            #else:
-                # TODO handle that better
-                #log("something went wrong wile uploading")
-                #raise Exception
+            # subprocess.run(['rm', '-rf', '%s.tgz' % folder_name])
+            # else:
+            # TODO handle that better
+            # log("something went wrong wile uploading")
+            # raise Exception
 
-        #self.logger.log("compression done")
-
-
+        # self.logger.log("compression done")
 
     def delete_local_files(self, folder_name):
         subprocess.run(['rm', '-rf', '%s' % folder_name])
@@ -501,8 +478,7 @@ class Recorder:
             print(out_str)
             return uploaded_file not in out_str
 
-
-    def compress(self, folder_name, format = "tgz"):
+    def compress(self, folder_name, format="tgz"):
         pid = psutil.Process(os.getpid())
         pid.nice(19)
 
@@ -510,7 +486,7 @@ class Recorder:
 
         if format == "tgz":
             output_file = '%s.tgz' % folder_name
-            call_args = ['tar', '--xattrs', '-czf', output_file , '-C', '%s' % folder_name, '.']
+            call_args = ['tar', '--xattrs', '-czf', output_file, '-C', '%s' % folder_name, '.']
         else:
             input_files = str(pathlib.Path(folder_name).absolute()) + '/*.jpg'
             output_file = '%s.mkv' % folder_name
@@ -527,10 +503,9 @@ class Recorder:
 
         return output_file
 
-
     def async_smbupload(self, file_to_upload, filename_at_destination=""):
         upload_proc = multiprocessing.Process(target=self.smbupload,
-                                                  args=(file_to_upload, filename_at_destination))
+                                              args=(file_to_upload, filename_at_destination))
         upload_proc.start()
 
     def smbupload(self, file_to_upload, filename_at_destination=""):
@@ -541,7 +516,7 @@ class Recorder:
             extension = pathlib.Path(file_to_upload).suffix
 
             if ok and extension == ".tgz":
-                #print(ok)
+                # print(ok)
                 try:
                     os.remove(file_to_upload)
                 except OSError as e:
@@ -552,7 +527,9 @@ class Recorder:
 
     def sshupload(self, file_to_upload, filename_at_destination=""):
 
-        self.logger.log(f'Uploading {file_to_upload} to {self.parameters["ssh_destination"]}:{self.ssh_output}/{filename_at_destination}', log_level=5)
+        self.logger.log(
+            f'Uploading {file_to_upload} to {self.parameters["ssh_destination"]}:{self.ssh_output}/{filename_at_destination}',
+            log_level=5)
 
         # Check if file_to_upload is not None
         if file_to_upload is not None:
@@ -570,7 +547,8 @@ class Recorder:
                 # Check the return code of the process
                 if process.returncode != 0:
                     # Log an error message if the process returned a non-zero code
-                    self.logger.log(f'Error occurred during scp: {stderr}', begin="\n    ERROR    ", end="\n\n", log_level=1)
+                    self.logger.log(f'Error occurred during scp: {stderr}', begin="\n    ERROR    ", end="\n\n",
+                                    log_level=1)
                     return False
 
                 # Check if the file has a .tgz extension
@@ -601,7 +579,8 @@ class Recorder:
             return process
         except Exception as e:
             # Log an error message if an exception occurs
-            self.logger.log(f'Error occurred while starting scp process: {e}', begin="\n    ERROR    ", end="\n\n", log_level=1)
+            self.logger.log(f'Error occurred while starting scp process: {e}', begin="\n    ERROR    ", end="\n\n",
+                            log_level=1)
             # Return None if an exception occurs
             return None
 
@@ -624,7 +603,8 @@ class Recorder:
             # Check if the network speed is less than 1 KB/s and more than 10 seconds have passed
             if network_speed < 1 and time.time() - start_time > 10:
                 # Log an error message and terminate the process if the conditions are met
-                self.logger.log(f'Network speed is less than 1 KB/s for more than 10 seconds. Stopping process.', begin="\n    ERROR    ", end="\n\n", log_level=1)
+                self.logger.log(f'Network speed is less than 1 KB/s for more than 10 seconds. Stopping process.',
+                                begin="\n    ERROR    ", end="\n\n", log_level=1)
                 process.terminate()
                 # Break the loop
                 break
@@ -659,7 +639,7 @@ class Recorder:
             user = os.getlogin()
             command = f'mkdir -p {self.parameters["ssh_dir"]}/{folder1}/{folder2}'
             print(command)
-            #self.sshcommand(command=f'mkdir {folder1}', working_dir=self.parameters["ssh_dir"])
+            # self.sshcommand(command=f'mkdir {folder1}', working_dir=self.parameters["ssh_dir"])
             self.sshcommand(command=command)
 
             self.logger.log(f'Created folder {folder1}/{folder2} in {self.parameters["ssh_dir"]}', log_level=5)
@@ -727,8 +707,7 @@ class Recorder:
         subprocess.run(
             ['ln', '-sf', '%s' % pathlib.Path(self.get_last_save_path()).absolute(), f'{tmp_folder}/last_frame.jpg'])
 
-
-### Other utility functions
+    ### Other utility functions
 
     def go_to_tmp_recording_folder(self):
         os.chdir(Path.home())
@@ -737,10 +716,9 @@ class Recorder:
         try:
             os.mkdir(self.parameters["local_tmp_dir"])
         except FileExistsError:
-            #os.remove(self.parameters["local_tmp_dir"])
-            #os.mkdir(self.parameters["local_tmp_dir"])
+            # os.remove(self.parameters["local_tmp_dir"])
+            # os.mkdir(self.parameters["local_tmp_dir"])
             pass
-
 
         os.chdir(self.parameters["local_tmp_dir"])
 
@@ -758,19 +736,19 @@ class Recorder:
             return True
         else:
             return False
+
     def pause_recording_in_s(self, time_to_pause):
-        self.logger.log(f"Pausing recording for {time_to_pause} seconds ({time_to_pause/3600} hours)")
+        self.logger.log(f"Pausing recording for {time_to_pause} seconds ({time_to_pause / 3600} hours)")
         if time_to_pause > 10:
             time.sleep(5)
             self.leds.turn_off()
-            time.sleep(time_to_pause-10)
+            time.sleep(time_to_pause - 10)
             self.leds.turn_on()
             time.sleep(5)
             self.pause_number += 1
         else:
             time.sleep(time_to_pause)
         self.logger.log("Recording resumed")
-
 
     def compute_total_number_of_frames(self):
         print("entered compute_total_number_of_frames")
@@ -783,11 +761,12 @@ class Recorder:
                     n_frames = 1
             else:
                 print("DEBUG WARNING: record_every_h is in minutes, not hours")
-                numer_of_acquisitions = int(self.parameters["timeout"] / (self.parameters["record_every_h"]*3600))
+                numer_of_acquisitions = int(self.parameters["timeout"] / (self.parameters["record_every_h"] * 3600))
                 print(f'timeout : {self.parameters["timeout"]}')
                 print(f'record_every_h : {self.parameters["record_every_h"]}')
                 print(f'number of acquisitions : {numer_of_acquisitions}')
-                n_frames = int(self.parameters["record_for_s"] / self.parameters["time_interval"]*numer_of_acquisitions)
+                n_frames = int(
+                    self.parameters["record_for_s"] / self.parameters["time_interval"] * numer_of_acquisitions)
                 print(f'number of frames : {n_frames}')
                 if n_frames == 0:
                     n_frames = 1
@@ -811,7 +790,7 @@ class Recorder:
         digits = int(ceil(log10(self.n_frames_total)))
         print(digits)
         if digits == 0:
-            digits+=1
+            digits += 1
         return f'%0{digits}d.jpg'
 
     def get_last_save_path(self):
@@ -866,8 +845,6 @@ class Recorder:
         if self.parameters["timeout"] == 0:
             return True
         return False
-
-
 
 
 """
