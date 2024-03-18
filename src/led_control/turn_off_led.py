@@ -8,6 +8,8 @@ def setup_and_output_low(pin=17):
     GPIO.setup(int(pin), GPIO.OUT)  # set GPIO pin as an output
     GPIO.output(int(pin), GPIO.LOW)  # set the GPIO pin to LOW
 
+    return 0
+
 def main():
 
     pin_number = sys.argv[1] if len(sys.argv) > 1 else 17

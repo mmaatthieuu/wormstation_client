@@ -2,13 +2,13 @@
 import RPi.GPIO as GPIO
 import sys
 
-
 def setup_and_output_high(pin=17):
     GPIO.setwarnings(False)
-
     GPIO.setmode(GPIO.BCM)  # set pin numbering mode to BCM
     GPIO.setup(int(pin), GPIO.OUT)  # set GPIO pin 17 as an output
     GPIO.output(int(pin), GPIO.HIGH)
+
+    return 0
 
 
 def main():
