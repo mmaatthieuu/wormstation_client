@@ -47,16 +47,18 @@ class Logger:
         if log_level not in log_level_prefixes:
             raise ValueError(f"Invalid log level: {log_level}")
 
-        # Construct the log message with the prefix
-        log_prefix = log_level_prefixes[log_level]
-        string = f'{begin}[{str(dt.datetime.now())}] {log_prefix} : {log_msg}'
+        # Only log if the message's log level is equal to or greater than the current verbosity level
+        if log_level <= self.verbosity_level:
+            # Construct the log message with the prefix
+            log_prefix = log_level_prefixes[log_level]
+            string = f'{begin}[{str(dt.datetime.now())}] {log_prefix} : {log_msg}'
 
-        # Write the log message to the appropriate output
-        if self.path is None:
-            print(string, end=end)
-        else:
-            with open(self.path, 'a') as log_file:
-                print(string, end=end, file=log_file)
+            # Write the log message to the appropriate output
+            if self.path is None:
+                print(string, end=end)
+            else:
+                with open(self.path, 'a') as log_file:
+                    print(string, end=end, file=log_file)
 
     def init_path(self, save_log, recording_name):
         # if save_log is True, create a log file in the user's home directory

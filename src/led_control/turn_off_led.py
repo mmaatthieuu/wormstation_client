@@ -1,11 +1,20 @@
 
 import RPi.GPIO as GPIO
+import sys
 
-GPIO.setwarnings(False)
+def setup_and_output_low(pin=17):
+    GPIO.setwarnings(False)
+    GPIO.setmode(GPIO.BCM)  # set pin numbering mode to BCM
+    GPIO.setup(pin, GPIO.OUT)  # set GPIO pin as an output
+    GPIO.output(pin, GPIO.LOW)  # set the GPIO pin to LOW
 
-GPIO.setmode(GPIO.BCM) # set pin numbering mode to BCM
-GPIO.setup(17, GPIO.OUT) # set GPIO pin 17 as an output
+def main():
 
-GPIO.output(17, GPIO.LOW)
+    pin_number = sys.argv[1] if len(sys.argv) > 1 else 17
 
-#GPIO.cleanup()
+    setup_and_output_low(pin_number)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
