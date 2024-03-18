@@ -12,19 +12,27 @@ import pandas as pd
 
 import numpy as np
 
+
 class Analyser:
-    def __init__(self, visualization=False, output_folder=None, logger=None):
+    def __init__(self, visualization=False, output_folder=None, logger=None, standalone=False):
         self.video_path = None
         self.visualization = visualization
         self.output_folder = output_folder
         self.logger = logger
+        self.standalone = standalone
 
-        self.logger.log("Analyser initialized", log_level=5)
+
+        print(self.standalone)
+
+        if not self.standalone:
+            self.logger.log("Analyser initialized", log_level=5)
 
     def run(self, video_path):
 
+
         print(f"Running analysis for {video_path}")
-        self.logger.log(f"Running analysis for {video_path}", log_level=3)
+        if not self.standalone:
+            self.logger.log(f"Running analysis for {video_path}", log_level=3)
 
         # Call the load_video function
         cap, width, height = self.load_video(video_path)
@@ -39,7 +47,8 @@ class Analyser:
 
         if not ret:
             print("Error: Could not read the first frame.")
-            self.logger.log("Error: Could not read the first frame.", log_level=1)
+            if not self.standalone:
+                self.logger.log("Error: Could not read the first frame.", log_level=1)
             return
 
         # get middle of the image width
@@ -100,6 +109,11 @@ class Analyser:
         except Exception as e:
             print(f"Error: Could not plot mean speed: {e}")
 
+
+        if self.visualization:
+            # Play movie with linked trajectories
+            self.play_movie_with_linked_trajectories(video_path, positions, trajectories)
+
         # return the list of created files
         return output_files
 
@@ -134,7 +148,8 @@ class Analyser:
 
     def load_video(self, video_path):
 
-        self.logger.log(f"Loading video from {video_path}", log_level=5)
+        if not self.standalone:
+            self.logger.log(f"Loading video from {video_path}", log_level=5)
         # Open the video file
         cap = cv2.VideoCapture(video_path)
 
@@ -227,7 +242,8 @@ class Analyser:
 
     def locate_worms(self, video_path, detected_circles=None, min_element_area_threshold=30, stop_at_frame=50):
 
-        self.logger.log(f"Locating worms in {video_path}", log_level=5)
+        if not self.standalone:
+            self.logger.log(f"Locating worms in {video_path}", log_level=5)
 
         # Open the video file
         cap = cv2.VideoCapture(video_path)
@@ -335,7 +351,8 @@ class Analyser:
 
     def compute_chemotaxis_index(self, all_centers_by_frame, middle):
 
-        self.logger.log(f"Computing chemotaxis index", log_level=5)
+        if not self.standalone:
+            self.logger.log(f"Computing chemotaxis index", log_level=5)
 
         # Dictionary to store chemotaxis index and related values for each frame
         chemotaxis_data_by_frame = {}
@@ -368,7 +385,8 @@ class Analyser:
 
     def compute_average_velocity_with_trackpy(self, all_centers_by_frame, frame_rate=2, search_range=15):
 
-        self.logger.log(f"Computing average velocity with trackpy", log_level=5)
+        if not self.standalone:
+            self.logger.log(f"Computing average velocity with trackpy", log_level=5)
 
         # Convert the dictionary of centers to a DataFrame compatible with trackpy
         df = pd.DataFrame([(frame, x, y) for frame, centers in all_centers_by_frame.items() for x, y in centers],
@@ -567,7 +585,8 @@ class Analyser:
                                     result_df, 'chemotaxis_data.csv')
         """
 
-        self.logger.log(f"Saving data to CSV file: {csv_filename}", log_level=5)
+        if not self.standalone:
+            self.logger.log(f"Saving data to CSV file: {csv_filename}", log_level=5)
 
         with open(csv_filename, 'w', newline='') as csvfile:
             csv_writer = csv.writer(csvfile)
@@ -598,7 +617,8 @@ class Analyser:
     def plot_chemotaxis_data(self, chemotaxis_data, frame_rate=2, output_prefix="chemotaxis_plot",
                              font_size=14):
 
-        self.logger.log(f"Plotting chemotaxis data", log_level=5)
+        if not self.standalone:
+            self.logger.log(f"Plotting chemotaxis data", log_level=5)
 
         # Extract frame indices
         frame_indices = sorted(chemotaxis_data.keys())
@@ -639,7 +659,8 @@ class Analyser:
 
     def plot_mean_speed(self, result_df, output_prefix="mean_speed_plot", font_size=14):
 
-        self.logger.log(f"Plotting mean speed", log_level=5)
+        if not self.standalone:
+            self.logger.log(f"Plotting mean speed", log_level=5)
 
         # Plot mean speed against frame number
         plt.figure(figsize=(10, 6))
@@ -686,10 +707,11 @@ def main():
 
     video_path = sys.argv[1]
 
+
     # Set the output folder to be the same folder as the input video
     output_folder = os.path.dirname(video_path)
 
-    analyser = Analyser(visualization=False, output_folder=output_folder)
+    analyser = Analyser(visualization=True, output_folder=output_folder, standalone=True)
 
     analyser.run(video_path)
 
