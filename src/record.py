@@ -650,19 +650,26 @@ class Recorder:
         if working_dir is None:
             working_dir = self.smb_output
 
-        ok = False
+        #ok = False
         try:
-            ok = subprocess.run(
+            result = subprocess.run(
                 ['smbclient',
                  f'{self.parameters["smb_service"]}',
                  '-W', f'{self.parameters["workgroup"]}',
                  '-A', f'{self.parameters["credentials_file"]}',
                  '-D', f'{working_dir}',
                  '-c', f'{command}'],
-                capture_output=True)
+                capture_output=True, text=True)
         except Exception as e:
             self.logger.log(e)
-        return ok
+
+        # Log or print stdout and stderr
+        if result.stdout:
+            self.logger.log("SMB Output:\n" + result.stdout, log_level=5)
+        if result.stderr:
+            self.logger.log("SMB Errors:\n" + result.stderr, log_level=1)
+
+        return result.returncode == 0
 
     def sshcommand(self, command, working_dir=None):
         user = os.getlogin()
