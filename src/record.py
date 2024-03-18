@@ -665,9 +665,9 @@ class Recorder:
 
         # Log or print stdout and stderr
         if result.stdout:
-            self.logger.log("SMB Output:\n" + result.stdout, log_level=5)
+            self.logger.log("SMB Error:\n" + result.stdout, log_level=1)
         if result.stderr:
-            self.logger.log("SMB Errors:\n" + result.stderr, log_level=1)
+            self.logger.log("SMB Output:\n" + result.stderr, log_level=5)
 
         return result.returncode == 0
 
