@@ -664,10 +664,11 @@ class Recorder:
             self.logger.log(e)
 
         # Log or print stdout and stderr
+        # Yes stdout and stderr are inverted, but it is the way it is (I have checked)
         if result.stdout:
-            self.logger.log("SMB Error:\n" + result.stdout, log_level=1)
+            self.logger.log("\nSMB Error:\n" + result.stdout, log_level=1)
         if result.stderr:
-            self.logger.log("SMB Output:\n" + result.stderr, log_level=5)
+            self.logger.log("SMB Output:\n" + result.stderr, log_level=6)
 
         return result.returncode == 0
 
