@@ -5,8 +5,8 @@ import sys
 def setup_and_output_low(pin=17):
     GPIO.setwarnings(False)
     GPIO.setmode(GPIO.BCM)  # set pin numbering mode to BCM
-    GPIO.setup(pin, GPIO.OUT)  # set GPIO pin as an output
-    GPIO.output(pin, GPIO.LOW)  # set the GPIO pin to LOW
+    GPIO.setup(int(pin), GPIO.OUT)  # set GPIO pin as an output
+    GPIO.output(int(pin), GPIO.LOW)  # set the GPIO pin to LOW
 
 def main():
 
