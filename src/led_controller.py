@@ -28,6 +28,7 @@ class LED():
         self.cleanup()
 
     def cleanup(self):
+        self.turn_off()
         if self.program and self.program.is_alive():
             self.program.terminate()
             self.program.join()
