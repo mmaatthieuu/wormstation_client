@@ -245,7 +245,7 @@ class Recorder:
 
                     if self.is_time_for_compression():
                         # self.logger.log("time for compression")
-                        self.logger.log("time for compression")
+                        self.logger.log("Time for compression", log_level=3)
                         self.start_async_compression_and_upload(format="mkv")
 
                     if self.parameters["use_samba"] and self.is_it_useful_to_save_logs():
@@ -394,7 +394,7 @@ class Recorder:
 
     def start_async_compression_and_upload(self, format):
         dir_to_compress = self.get_current_dir()
-        self.logger.log("Dir_to_compress : %s" % dir_to_compress)
+        self.logger.log(f'Compressing and uploading {dir_to_compress}, with format {format}', log_level=5)
         # log("Dest path : %s " % output_folder)
         # self.save_process.join()
         self.compress_process = multiprocessing.Process(target=self.compress_and_upload,
@@ -405,12 +405,20 @@ class Recorder:
         # self.logger.log("start compression")
         compressed_file = self.compress(folder_name=folder_name, format=format)
 
+
+        # TODO: need to disentangle this mess (compression, analysis, upload)
+
+
         analyser = Analyser(logger=self.logger)
         output_files = []
 
         if self.parameters["compute_chemotaxis"]:
             output_files = analyser.run(video_path=compressed_file)
-            self.logger.log(f"Output files : {output_files}", log_level=5)
+
+        else:
+            output_files = [compressed_file]
+
+        self.logger.log(f"Output files : {output_files}", log_level=5)
 
         if self.parameters["use_samba"] is True or self.parameters["use_ssh"] is True:
             file_to_upload = compressed_file
@@ -483,10 +491,11 @@ class Recorder:
             return uploaded_file not in out_str
 
     def compress(self, folder_name, format="tgz"):
+
+        self.logger.log(f'Compressing {folder_name} to {format}', log_level=5)
+
         pid = psutil.Process(os.getpid())
         pid.nice(19)
-
-        self.logger.log("Starting compression of %s" % folder_name)
 
         if format == "tgz":
             output_file = '%s.tgz' % folder_name
@@ -500,6 +509,10 @@ class Recorder:
                          '-refs', '2', '-preset', 'veryfast', '-profile:v',
                          'main', '-threads', '4', '-hide_banner',
                          '-loglevel', 'warning', output_file]
+
+        args_string = ' '.join(call_args)
+        self.logger.log(f'Running command : {args_string}', log_level=5)
+
 
         subprocess.run(call_args, stdout=subprocess.DEVNULL)
 
