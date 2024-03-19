@@ -423,6 +423,9 @@ class Recorder:
                     print(f"#DEBUG uploading {file_to_upload}, trial {n_trials}")
                     if self.parameters["use_samba"]:
                         ok = self.smbupload(file_to_upload=file_to_upload)
+                        if self.parameters["compute_chemotaxis"]:
+                            for file in output_files:
+                                ok = self.sshupload(file_to_upload=file)
                     elif self.parameters["use_ssh"]:
                         ok = self.sshupload(file_to_upload=file_to_upload)
                         if self.parameters["compute_chemotaxis"]:
@@ -432,6 +435,7 @@ class Recorder:
 
                     if n_trials > 5:
                         print(f"#DEBUG ulpoad failed {n_trials} times")
+                        self.logger.log("Upload failed", log_level=1)
                         raise TimeoutError("Uplaod failed")
 
                 self.logger.log("Upload successful")
