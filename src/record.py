@@ -434,7 +434,7 @@ class Recorder:
                         ok = self.smbupload(file_to_upload=file_to_upload)
                         if self.parameters["compute_chemotaxis"]:
                             for file in output_files:
-                                ok = self.sshupload(file_to_upload=file)
+                                ok = self.smbupload(file_to_upload=file)
                     elif self.parameters["use_ssh"]:
                         ok = self.sshupload(file_to_upload=file_to_upload)
                         if self.parameters["compute_chemotaxis"]:
