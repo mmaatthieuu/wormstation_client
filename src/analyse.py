@@ -28,9 +28,8 @@ class Analyser:
             self.logger.log("Analyser initialized", log_level=5)
 
     def run(self, video_path):
-
-
         print(f"Running analysis for {video_path}")
+
         if not self.standalone:
             self.logger.log(f"Running analysis for {video_path}", log_level=3)
 

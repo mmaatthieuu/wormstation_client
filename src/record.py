@@ -416,6 +416,7 @@ class Recorder:
             output_files = analyser.run(video_path=compressed_file)
 
         else:
+            self.logger.log("Skipping Analysis", log_level=5)
             output_files = [compressed_file]
 
         self.logger.log(f"Output files : {output_files}", log_level=5)
@@ -480,8 +481,9 @@ class Recorder:
 
     def upload_failed(self, uploaded_file):
         if self.parameters["use_samba"]:
-            out_str = self.smbcommand("ls").stdout.decode("utf-8")
-            return uploaded_file not in out_str
+            success, out_str = self.smbcommand("ls")  # Receive the tuple
+            # Decode is not needed anymore as we already specify text=True in subprocess.run
+            return uploaded_file not in out_str if success else True
         elif self.parameters["use_ssh"]:
             user = os.getlogin()
             out_str = subprocess.run(['ssh', f'{user}@{self.parameters["ssh_destination"]}',
@@ -700,7 +702,7 @@ class Recorder:
         if result.stderr:
             self.logger.log("SMB Output:\n" + result.stderr, log_level=6)
 
-        return result.returncode == 0
+        return result.returncode == 0, result.stdout, result.stderr
 
     def sshcommand(self, command, working_dir=None):
         user = os.getlogin()
