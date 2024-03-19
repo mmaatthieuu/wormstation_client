@@ -693,7 +693,7 @@ class Recorder:
 
         # Log or print stdout and stderr
         # Note: Handling the case where stdout and stderr are said to be inverted
-        if result.stdout:
+        if result.stdout and command != "ls":
             # Handle specific SMB warning
             if result.stdout.startswith("NT_STATUS_OBJECT_NAME_COLLISION"):
                 self.logger.log("SMB INFO: " + result.stdout, log_level=3)
@@ -702,7 +702,7 @@ class Recorder:
         if result.stderr:
             self.logger.log("SMB Output:\n" + result.stderr, log_level=6)
 
-        return result.returncode == 0, result.stdout, result.stderr
+        return result.returncode == 0, result.stdout
 
     def sshcommand(self, command, working_dir=None):
         user = os.getlogin()
