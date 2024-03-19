@@ -509,6 +509,7 @@ class Recorder:
         upload_proc.start()
 
     def smbupload(self, file_to_upload, filename_at_destination=""):
+        self.logger.log(f'Uploading {file_to_upload} to {filename_at_destination}', log_level=5)
         if file_to_upload is not None:
             command = f'put {file_to_upload} {filename_at_destination}'
             ok = self.smbcommand(command)
@@ -651,6 +652,14 @@ class Recorder:
             working_dir = self.smb_output
 
         try:
+            smb_full_command = (f'smbclient '
+                                f'{self.parameters["smb_service"]} '
+                                f'-W {self.parameters["workgroup"]} '
+                                f'-A {self.parameters["credentials_file"]} '
+                                f'-D {working_dir} -'
+                                f'c {command}')
+
+            self.logger.log(f'Executing command : {smb_full_command}', log_level=5)
             result = subprocess.run(
                 ['smbclient',
                  f'{self.parameters["smb_service"]}',
