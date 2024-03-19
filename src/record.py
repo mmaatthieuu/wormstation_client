@@ -650,7 +650,6 @@ class Recorder:
         if working_dir is None:
             working_dir = self.smb_output
 
-        #ok = False
         try:
             result = subprocess.run(
                 ['smbclient',
@@ -662,11 +661,16 @@ class Recorder:
                 capture_output=True, text=True)
         except Exception as e:
             self.logger.log(e)
+            return False  # Assuming you want to return False when an exception is caught
 
         # Log or print stdout and stderr
-        # Yes stdout and stderr are inverted, but it is the way it is (I have checked)
+        # Note: Handling the case where stdout and stderr are said to be inverted
         if result.stdout:
-            self.logger.log("\nSMB Error:\n" + result.stdout, log_level=1)
+            # Handle specific SMB warning
+            if result.stdout.startswith("NT_STATUS_OBJECT_NAME_COLLISION"):
+                self.logger.log("SMB INFO: " + result.stdout, log_level=3)
+            else:
+                self.logger.log("\nSMB Error:\n" + result.stdout, log_level=1)
         if result.stderr:
             self.logger.log("SMB Output:\n" + result.stderr, log_level=6)
 
