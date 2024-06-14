@@ -170,6 +170,10 @@ class Recorder:
 
         # self.create_output_folder()
 
+        if self.parameters["use_samba"] and self.is_it_useful_to_save_logs():
+            self.async_smbupload(file_to_upload=self.logger.get_log_file_path(),
+                                 filename_at_destination=self.logger.get_log_filename())
+
         # Main recording loop
         for self.current_frame_number in range(self.parameters["start_frame"], self.n_frames_total):
             self.skip_frame = False
@@ -248,9 +252,11 @@ class Recorder:
                         self.logger.log("Time for compression", log_level=3)
                         self.start_async_compression_and_upload(format="mkv")
 
-                    if self.parameters["use_samba"] and self.is_it_useful_to_save_logs():
-                        self.async_smbupload(file_to_upload=self.logger.get_log_file_path(),
-                                             filename_at_destination=self.logger.get_log_filename())
+                        if self.parameters["use_samba"] and self.is_it_useful_to_save_logs():
+                            # This is overwhelming for pour NAS CPU if done too often
+                            self.async_smbupload(file_to_upload=self.logger.get_log_file_path(),
+                                                filename_at_destination=self.logger.get_log_filename())
+
                 # create link to last frame
                 self.create_symlink_to_last_frame()
 
@@ -405,6 +411,19 @@ class Recorder:
         # self.logger.log("start compression")
         compressed_file = self.compress(folder_name=folder_name, format=format)
 
+        # Check if the file has been created
+        if not os.path.exists(compressed_file):
+            # The compression failed
+            self.logger.log("Compression failed", log_level=1)
+        else:
+            # The compression was successful
+            # Remove the original folder
+
+            # The data are now saved as a movie, it is better to delete the pictures to avoid saturating the disk
+            # in case of failed upload
+            subprocess.run(['rm', '-rf', '%s' % folder_name])
+
+
 
         # TODO: need to disentangle this mess (compression, analysis, upload)
 
@@ -450,7 +469,7 @@ class Recorder:
                 self.logger.log("Upload successful")
                 # TODO : Maybe add check on NAS to confirm sucessful upload
                 self.logger.log("Deleting local files")
-                subprocess.run(['rm', '-rf', '%s' % folder_name])
+                # Delete video file
                 subprocess.run(['rm', '-rf', '%s.%s' % (folder_name, format)])
 
                 for file in output_files:
