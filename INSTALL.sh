@@ -182,6 +182,102 @@ else
     echo "OpenCV installation found."
 fi
 
+# Check if picamera is installed
+if ! python3 -c "import picamera" &> /dev/null; then
+    echo "picamera is not installed. Installing picamera using pip..."
+
+    if [ "$yes_flag" = true ]; then
+        pip3 install picamera
+    else
+        read -p "Do you want to install picamera? (y/n): " install_picamera
+        if [ "$install_picamera" = "y" ]; then
+            pip3 install picamera
+        fi
+    fi
+else
+    echo "picamera installation found."
+fi
+
+# Check if numpy is installed
+if ! python3 -c "import numpy" &> /dev/null; then
+    echo "numpy is not installed. Installing numpy using pip..."
+
+    if [ "$yes_flag" = true ]; then
+        pip3 install numpy
+    else
+        read -p "Do you want to install numpy? (y/n): " install_numpy
+        if [ "$install_numpy" = "y" ]; then
+            pip3 install numpy
+        fi
+    fi
+else
+    echo "numpy installation found."
+fi
+
+# Check if pandas is installed
+if ! python3 -c "import pandas" &> /dev/null; then
+    echo "pandas is not installed. Installing pandas using pip..."
+
+    if [ "$yes_flag" = true ]; then
+        pip3 install pandas
+    else
+        read -p "Do you want to install pandas? (y/n): " install_pandas
+        if [ "$install_pandas" = "y" ]; then
+            pip3 install pandas
+        fi
+    fi
+else
+    echo "pandas installation found."
+fi
+
+# Check if matplotlib is installed
+if ! python3 -c "import matplotlib" &> /dev/null; then
+    echo "matplotlib is not installed. Installing matplotlib using pip..."
+
+    if [ "$yes_flag" = true ]; then
+        pip3 install matplotlib
+    else
+        read -p "Do you want to install matplotlib? (y/n): " install_matplotlib
+        if [ "$install_matplotlib" = "y" ]; then
+            pip3 install matplotlib
+        fi
+    fi
+else
+    echo "matplotlib installation found."
+fi
+
+# check if tqdm is installed
+if ! python3 -c "import tqdm" &> /dev/null; then
+    echo "tqdm is not installed. Installing tqdm using pip..."
+
+    if [ "$yes_flag" = true ]; then
+        pip3 install tqdm
+    else
+        read -p "Do you want to install tqdm? (y/n): " install_tqdm
+        if [ "$install_tqdm" = "y" ]; then
+            pip3 install tqdm
+        fi
+    fi
+else
+    echo "tqdm installation found."
+fi
+
+# Check if smbclient is installed
+if ! python3 -c "import smb" &> /dev/null; then
+    echo "smb is not installed. Installing smb using pip..."
+
+    if [ "$yes_flag" = true ]; then
+        pip3 install smb
+    else
+        read -p "Do you want to install smb? (y/n): " install_smb
+        if [ "$install_smb" = "y" ]; then
+            pip3 install smb
+        fi
+    fi
+else
+    echo "smb installation found."
+fi
+
 # Check if /etc/.smbpicreds exists
 if [ ! -f /etc/.smbpicreds ]; then
     echo "No credential file for smbclient was found (/etc/.smbpicreds)."
