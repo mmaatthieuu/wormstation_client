@@ -115,7 +115,16 @@ if sudo ln -s $script_path /usr/local/bin/picam 2>/dev/null; then
 else
     link_status=$?
     if [ $link_status -eq 1 ]; then
-        echo "Symbolic link 'picam' already exists in /usr/local/bin. Nothing to do."
+      # check if it points to the same file
+      if [ "$(readlink /usr/local/bin/picam)" = "$script_path" ]; then
+          echo "Symbolic link 'picam' already exists in /usr/local/bin. Nothing to do."
+      else
+        # delete the existing link and create a new one
+        sudo rm /usr/local/bin/picam
+        sudo ln -s $script_path /usr/local/bin/picam
+        echo "Symbolic link 'picam' successfully created in /usr/local/bin."
+      fi
+
     else
         echo "Failed to create symbolic link. Please check the script path and try again."
     fi
