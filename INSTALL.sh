@@ -198,6 +198,14 @@ else
     echo "matplotlib installation found."
 fi
 
+# Check if paramiko is installed
+if ! python3 -c "import paramiko" &> /dev/null; then
+    echo "paramiko is not installed."
+    missing_libs+=("paramiko")
+else
+    echo "paramiko installation found."
+fi
+
 # Check if tqdm is installed
 if ! python3 -c "import tqdm" &> /dev/null; then
     echo "tqdm is not installed."
