@@ -221,22 +221,6 @@ else
     fi
 fi
 
-# Check if smbclient is installed
-if ! python3 -c "import smb" &> /dev/null; then
-    echo "smb is not installed. Installing smb using pip..."
-
-    if [ "$yes_flag" = true ]; then
-        pip3 install smb
-    else
-        read -p "Do you want to install smb? (y/n): " install_smb
-        if [ "$install_smb" = "y" ]; then
-            pip3 install smb
-        fi
-    fi
-else
-    echo "smb installation found."
-fi
-
 # Check if /etc/.smbpicreds exists
 if [ ! -f /etc/.smbpicreds ]; then
     echo "No credential file for smbclient was found (/etc/.smbpicreds)."
