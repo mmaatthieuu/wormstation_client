@@ -131,37 +131,38 @@ else
 fi
 
 
+# Initialize the list of groups the user is not part of
+missing_groups=()
+
 # Check if user is part of gpio group
 if ! groups | grep -q '\bgpio\b'; then
-    read -p "You are not part of the 'gpio' group. This is required to properly run Wormstation-client. Do you want to add yourself to the group? (y/n): " add_to_gpio
-    if [ "$add_to_gpio" = "y" ]; then
-        sudo usermod -aG gpio $USER
-        echo "Added user to 'gpio' group. Changes will take effect after logging out and back in."
-    fi
-else
-    echo "User is already part of the 'gpio' group."
+    missing_groups+=("gpio")
 fi
 
 # Check if user is part of video group
 if ! groups | grep -q '\bvideo\b'; then
-    read -p "You are not part of the 'video' group. This is required to properly run Wormstation-client. Do you want to add yourself to the group? (y/n): " add_to_video
-    if [ "$add_to_video" = "y" ]; then
-        sudo usermod -aG video $USER
-        echo "Added user to 'video' group. Changes will take effect after logging out and back in."
-    fi
-else
-    echo "User is already part of the 'video' group."
+    missing_groups+=("video")
 fi
 
 # Check if user is part of input group
 if ! groups | grep -q '\binput\b'; then
-    read -p "You are not part of the 'input' group. This is required to properly run Wormstation-client. Do you want to add yourself to the group? (y/n): " add_to_input
-    if [ "$add_to_input" = "y" ]; then
-        sudo usermod -aG input $USER
-        echo "Added user to 'input' group. Changes will take effect after logging out and back in."
+    missing_groups+=("input")
+fi
+
+# If there are missing groups, prompt the user
+if [ ${#missing_groups[@]} -ne 0 ]; then
+    echo "You are not part of the following required groups: ${missing_groups[@]}"
+    read -p "Do you want to add yourself to these groups? (y/n): " add_to_groups
+    if [ "$add_to_groups" = "y" ]; then
+        for group in "${missing_groups[@]}"; do
+            sudo usermod -aG $group $USER
+        done
+        echo "Added user to the required groups. Changes will take effect after logging out and back in."
+    else
+        echo "You chose not to add yourself to the required groups. Some functionalities may not work properly."
     fi
 else
-    echo "User is already part of the 'input' group."
+    echo "User is already part of all required groups."
 fi
 
 echo Installing python dependencies...
