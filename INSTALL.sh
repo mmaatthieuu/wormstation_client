@@ -174,12 +174,12 @@ else
     echo "OpenCV installation found."
 fi
 
-# Check if numpy is installed
-if ! python3 -c "import numpy" &> /dev/null; then
-    echo "numpy is not installed."
+# Check if the specific version of numpy is installed
+if ! python3 -c "import numpy; assert numpy.__version__ == '1.26.3'" &> /dev/null; then
+    echo "numpy 1.26.3 is not installed."
     missing_libs+=("numpy==1.26.3")
 else
-    echo "numpy installation found."
+    echo "numpy 1.26.3 installation found."
 fi
 
 # Check if pandas is installed
