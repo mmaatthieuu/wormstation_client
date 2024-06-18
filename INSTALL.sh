@@ -168,98 +168,57 @@ echo Installing python dependencies...
 
 # Check if opencv is installed
 if ! python3 -c "import cv2" &> /dev/null; then
-    echo "OpenCV is not installed. Installing opencv using pip..."
-    
-    if [ "$yes_flag" = true ]; then
-        pip3 install opencv-python
-    else
-        read -p "Do you want to install opencv? (y/n): " install_opencv
-        if [ "$install_opencv" = "y" ]; then
-            pip3 install opencv-python
-        fi
-    fi
+    echo "OpenCV is not installed."
+    missing_libs+=("opencv-python")
 else
     echo "OpenCV installation found."
 fi
 
-# Check if picamera is installed
-if ! python3 -c "import picamera" &> /dev/null; then
-    echo "picamera is not installed. Installing picamera using pip..."
-
-    if [ "$yes_flag" = true ]; then
-        pip3 install picamera
-    else
-        read -p "Do you want to install picamera? (y/n): " install_picamera
-        if [ "$install_picamera" = "y" ]; then
-            pip3 install picamera
-        fi
-    fi
-else
-    echo "picamera installation found."
-fi
-
 # Check if numpy is installed
 if ! python3 -c "import numpy" &> /dev/null; then
-    echo "numpy is not installed. Installing numpy using pip..."
-
-    if [ "$yes_flag" = true ]; then
-        pip3 install numpy
-    else
-        read -p "Do you want to install numpy? (y/n): " install_numpy
-        if [ "$install_numpy" = "y" ]; then
-            pip3 install numpy
-        fi
-    fi
+    echo "numpy is not installed."
+    missing_libs+=("numpy")
 else
     echo "numpy installation found."
 fi
 
 # Check if pandas is installed
 if ! python3 -c "import pandas" &> /dev/null; then
-    echo "pandas is not installed. Installing pandas using pip..."
-
-    if [ "$yes_flag" = true ]; then
-        pip3 install pandas
-    else
-        read -p "Do you want to install pandas? (y/n): " install_pandas
-        if [ "$install_pandas" = "y" ]; then
-            pip3 install pandas
-        fi
-    fi
+    echo "pandas is not installed."
+    missing_libs+=("pandas")
 else
     echo "pandas installation found."
 fi
 
 # Check if matplotlib is installed
 if ! python3 -c "import matplotlib" &> /dev/null; then
-    echo "matplotlib is not installed. Installing matplotlib using pip..."
-
-    if [ "$yes_flag" = true ]; then
-        pip3 install matplotlib
-    else
-        read -p "Do you want to install matplotlib? (y/n): " install_matplotlib
-        if [ "$install_matplotlib" = "y" ]; then
-            pip3 install matplotlib
-        fi
-    fi
+    echo "matplotlib is not installed."
+    missing_libs+=("matplotlib")
 else
     echo "matplotlib installation found."
 fi
 
-# check if tqdm is installed
+# Check if tqdm is installed
 if ! python3 -c "import tqdm" &> /dev/null; then
-    echo "tqdm is not installed. Installing tqdm using pip..."
-
-    if [ "$yes_flag" = true ]; then
-        pip3 install tqdm
-    else
-        read -p "Do you want to install tqdm? (y/n): " install_tqdm
-        if [ "$install_tqdm" = "y" ]; then
-            pip3 install tqdm
-        fi
-    fi
+    echo "tqdm is not installed."
+    missing_libs+=("tqdm")
 else
     echo "tqdm installation found."
+fi
+
+# Check if there are any missing libraries
+if [ ${#missing_libs[@]} -eq 0 ]; then
+    echo "All required libraries are already installed."
+else
+    echo "The following libraries are missing: ${missing_libs[@]}"
+    if [ "$yes_flag" = true ]; then
+        pip3 install "${missing_libs[@]}"
+    else
+        read -p "Do you want to install the missing libraries? (y/n): " install_libs
+        if [ "$install_libs" = "y" ]; then
+            pip3 install "${missing_libs[@]}"
+        fi
+    fi
 fi
 
 # Check if smbclient is installed
