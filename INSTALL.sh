@@ -177,7 +177,7 @@ fi
 # Check if numpy is installed
 if ! python3 -c "import numpy" &> /dev/null; then
     echo "numpy is not installed."
-    missing_libs+=("numpy")
+    missing_libs+=("numpy==1.26.3")
 else
     echo "numpy installation found."
 fi
@@ -188,6 +188,22 @@ if ! python3 -c "import pandas" &> /dev/null; then
     missing_libs+=("pandas")
 else
     echo "pandas installation found."
+fi
+
+# Check if picamera2 is installed
+if ! python3 -c "import picamera2" &> /dev/null; then
+    echo "picamera2 is not installed."
+    missing_libs+=("picamera2==0.3.12")
+else
+    echo "picamera installation found."
+fi
+
+# Check if trackpy is installed
+if ! python3 -c "import trackpy" &> /dev/null; then
+    echo "trackpy is not installed."
+    missing_libs+=("trackpy")
+else
+    echo "trackpy installation found."
 fi
 
 # Check if matplotlib is installed
