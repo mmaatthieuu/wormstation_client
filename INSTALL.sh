@@ -175,14 +175,13 @@ else
     echo "OpenCV installation found."
 fi
 
-# Check if the specific version of numpy is installed
-if ! python3 -c "import numpy; assert numpy.__version__ == '1.26.3'" &> /dev/null; then
-    echo "numpy 1.26.3 is not installed."
+# Check if any version of numpy 1.26.* is installed
+if ! python3 -c "import re; import numpy; assert re.match(r'1\.26\.\d+', numpy.__version__)" &> /dev/null; then
+    echo "numpy 1.26.x is not installed."
     missing_libs+=("numpy==1.26.3")
 else
-    echo "numpy 1.26.3 installation found."
+    echo "numpy 1.26.x installation found."
 fi
-
 # Check if pandas is installed
 if ! python3 -c "import pandas" &> /dev/null; then
     echo "pandas is not installed."
@@ -213,14 +212,6 @@ if ! python3 -c "import matplotlib" &> /dev/null; then
     missing_libs+=("matplotlib")
 else
     echo "matplotlib installation found."
-fi
-
-# Check if paramiko is installed
-if ! python3 -c "import paramiko" &> /dev/null; then
-    echo "paramiko is not installed."
-    missing_libs+=("paramiko")
-else
-    echo "paramiko installation found."
 fi
 
 # Check if tqdm is installed

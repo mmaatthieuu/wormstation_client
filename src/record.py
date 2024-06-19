@@ -134,6 +134,8 @@ class Recorder:
         # TODO : check if samba config is working
         # TODO : clean tmp local dir
 
+        print("#DEBUG Starting recording")
+
         # Go to home directory
         self.go_to_tmp_recording_folder()
 
@@ -151,11 +153,14 @@ class Recorder:
             #                                    period=self.parameters["time_interval"],
             #                                    timeout=self.parameters["timeout"])
             # Todo check that
-            # self.leds.run_led_timer(duration=self.parameters["illumination_pulse"]/1000,
-            #                         period=self.parameters["time_interval"],
-            #                         timeout=self.parameters["timeout"])
+            print("#DEBUG Starting LED timer with duration %f, period %f, timeout %f" % (self.parameters["illumination_pulse"]/1000,
+                                                                                  self.parameters["time_interval"],
+                                                                                  self.parameters["timeout"]))
+            self.leds.run_led_timer(duration=self.parameters["illumination_pulse"]/1000,
+                                    period=self.parameters["time_interval"],
+                                    timeout=self.parameters["timeout"])
 
-            self.leds.turn_on()
+            #self.leds.turn_on()
 
             # wait_time, _ = get_remaining_time_to_next_seconds(time.time(),4)
             # time.sleep(wait_time)
@@ -810,7 +815,7 @@ class Recorder:
         self.logger.log("Recording resumed")
 
     def compute_total_number_of_frames(self):
-        print("entered compute_total_number_of_frames")
+        print("#DEBUG entered compute_total_number_of_frames")
         print(self.pause_mode)
         n_frames = 0
         try:
