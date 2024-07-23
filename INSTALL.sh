@@ -17,6 +17,7 @@ echo "    - picam (symbolic link to cam.py)"
 echo "    - /etc/.smbpicreds (credential file for smbclient)"
 echo "    - Add current user to 'gpio', 'video' and 'input' groups"
 echo "    - Modify /etc/dphys-swapfile to extend swap size to 2GB"
+echo "    - Add specific sudo privileges for the current user"
 echo
 
 
@@ -278,12 +279,25 @@ Enter your choice (1/2/3): " smbcred_choice
             echo "Invalid choice."
             ;;
     esac
+else
+    echo "Credential file for smbclient found."
+    # Check if the credential file has the correct permissions
+    if [ "$(stat -c %a /etc/.smbpicreds)" != "600" ]; then
+        sudo chmod 600 /etc/.smbpicreds
+        sudo chown $USER:$USER /etc/.smbpicreds
+        echo "Credential file permissions updated."
 fi
 
 # Modify /etc/dphys-swapfile
 echo "Extending swap size to 2GB..."
 # It should be 3GB but in practice it is limited to 2GB
 sudo sed -i 's/^CONF_SWAPSIZE=.*/CONF_SWAPSIZE=3072/' /etc/dphys-swapfile
+
+current_user=$(whoami)
+sudoers_entry="${current_user} ALL=(ALL) NOPASSWD: /sbin/poweroff, /sbin/halt, /sbin/reboot, /bin/mount, /bin/umount"
+
+echo "Adding specific sudo privileges for the current user..."
+echo "$sudoers_entry" | sudo tee -a /etc/sudoers.d/$current_user > /dev/null
 
 echo
 echo
