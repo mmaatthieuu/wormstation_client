@@ -204,6 +204,41 @@ class UploadManager:
         return output_file
 
 
+    def upload_remaining_files(self, rec_folder):
+        self.logger.log("Checking if all files are uploaded", log_level=3)
+
+        # Check if there are some not uploaded files
+
+        # Get list of files in the current directory
+        files = os.listdir(rec_folder)
+
+        # Log files that are not uploaded
+        self.logger.log(f"Files not uploaded : {files}", log_level=3)
+
+        # Check if there are any files in the directory
+        if len(files) > 0:
+            for file in files:
+                # Upload the file to the NAS
+                upload_ok = self.upload(file_to_upload=file, async_upload=False)
+                # When upload is done, and successful, remove the file
+                if upload_ok:
+                    self.logger.log(f"File {file} uploaded successfully, deleting locally", log_level=3)
+                    os.remove(file)
+
+                else:
+                    self.logger.log(f"File {file} not uploaded, keeping it locally", log_level=1)
+                    # Create a folder in the parent folder named after recodring name
+                    local_folder_save = os.path.join('../', self.remote_dir)
+                    os.makedirs(local_folder_save, exist_ok=True)
+                    # Move the file to the folder
+                    self.logger.log(f"Moving {file} to {local_folder_save}", log_level=3)
+                    os.rename(file, os.path.join(local_folder_save, file))
+
+
+        else:
+            self.logger.log("No files to upload", log_level=3)
+
+
     def start(self):
         self.mount()
         self.create_working_dir()
@@ -363,3 +398,33 @@ class SSHManager(UploadManager):
         ping_cmd = ["ping", "-c", "1", ssh_host]
         result = subprocess.run(ping_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return result.returncode == 0
+
+
+class EmptyUploader:
+    def __init__(self):
+        pass
+
+    def mount(self):
+        return True
+
+    def unmount(self):
+        return True
+
+    def is_mounted(self):
+        return True
+
+    def is_accessible(self):
+        return True
+
+    def get_tree_structure(self, remote_dir, recording_name):
+        return remote_dir
+
+    def wait_for_compression(self):
+        return True
+
+    def upload(self, file_to_upload, filename_at_destination="", async_upload=True):
+        return True
+
+    def upload_remaining_files(self, rec_folder):
+        return True
+

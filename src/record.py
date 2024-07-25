@@ -29,7 +29,7 @@ from pathlib import Path
 
 import src.NPImage as npi
 from src.log import Logger
-from src.upload_manager import SMBManager, SSHManager
+from src.upload_manager import SMBManager, SSHManager, EmptyUploader
 from src.analyse import Analyser
 
 '''
@@ -69,7 +69,7 @@ class Recorder:
         # If the camera is initialized first, it produces only black frames...
         # It is weird, but at least it works like that
 
-        self.uploader = None
+        self.uploader = EmptyUploader()
         if self.parameters["use_samba"]:
             self.uploader = SMBManager(nas_server=self.parameters["nas_server"],
                                        share_name=self.parameters["share_name"],
@@ -77,6 +77,9 @@ class Recorder:
                                        working_dir=self.parameters["smb_dir"],
                                        recording_name=self.parameters["recording_name"],
                                        logger=self.logger)
+
+            self.uploader.start()
+
         elif self.parameters["use_ssh"]:
             # Not implemented yet, print some warning and quit
             self.logger.log("SSH upload not implemented yet", log_level=1)
@@ -91,7 +94,7 @@ class Recorder:
 
 
 
-        self.uploader.start()
+
 
         # Create the camera object with the input parameters
         self.camera = Camera(parameters=self.parameters)
@@ -291,7 +294,7 @@ class Recorder:
 
         self.uploader.wait_for_compression()
 
-        self.upload_remaining_files()
+        self.uploader.upload_remaining_files(self.go_to_tmp_recording_folder())
 
         self.logger.log("Recording done (Timeout reached)",begin='\n\n', end='\n\n\n',log_level=3)
 
@@ -771,44 +774,13 @@ class Recorder:
         return False
 
     def upload_logs(self):
-        self.uploader.upload(file_to_upload=self.logger.get_log_file_path(),
+        try:
+            self.uploader.upload(file_to_upload=self.logger.get_log_file_path(),
                              filename_at_destination=self.logger.get_log_filename())
-
-    def upload_remaining_files(self):
-        self.logger.log("Checking if all files are uploaded", log_level=3)
-
-        # Check if there are some not uploaded files
-
-        rec_folder = self.go_to_tmp_recording_folder()
-
-        # Get list of files in the current directory
-        files = os.listdir(rec_folder)
-
-        # Log files that are not uploaded
-        self.logger.log(f"Files not uploaded : {files}", log_level=3)
-
-        # Check if there are any files in the directory
-        if len(files) > 0:
-            for file in files:
-                # Upload the file to the NAS
-                upload_ok = self.uploader.upload(file_to_upload=file, async_upload=False)
-                # When upload is done, and successful, remove the file
-                if upload_ok:
-                    self.logger.log(f"File {file} uploaded successfully, deleting locally", log_level=3)
-                    os.remove(file)
-
-                else:
-                    self.logger.log(f"File {file} not uploaded, keeping it locally", log_level=1)
-                    # Create a folder in the parent folder named after recodring name
-                    local_folder_save = os.path.join('../', self.uploader.remote_dir)
-                    os.makedirs(local_folder_save, exist_ok=True)
-                    # Move the file to the folder
-                    self.logger.log(f"Moving {file} to {local_folder_save}", log_level=3)
-                    os.rename(file, os.path.join(local_folder_save, file))
+        except TypeError:
+            pass
 
 
-        else:
-            self.logger.log("No files to upload", log_level=3)
 
 
 
