@@ -20,7 +20,6 @@ echo "    - Modify /etc/dphys-swapfile to extend swap size to 2GB"
 echo "    - Add specific sudo privileges for the current user"
 echo
 
-
 # Process command line arguments
 while getopts ":hy" opt; do
     case $opt in
@@ -37,10 +36,11 @@ while getopts ":hy" opt; do
     esac
 done
 
-# ask for confirmation if -y flag is not used
+# Ask for confirmation if -y flag is not used
 if [ "$yes_flag" = false ]; then
     read -p "Do you want to continue? (y/n): " continue_install
-    if [ "$continue_install" != "y" ]; then
+    continue_install=${continue_install:-y}
+    if [[ "$continue_install" =~ ^[Nn]$ ]]; then
         echo "Installation aborted."
         exit 0
     fi
@@ -54,83 +54,50 @@ if [ "$help_flag" = true ]; then
     exit 0
 fi
 
-# Check if git is installed
-if ! command -v git &> /dev/null; then
-    echo "Git is not installed. Installing git using apt..."
-    
-    if [ "$yes_flag" = true ]; then
-        sudo apt update
-        sudo apt install git -y
-    else
-        read -p "Do you want to install git? (y/n): " install_git
-        if [ "$install_git" = "y" ]; then
+# Function to install a package using apt
+install_package() {
+    local package=$1
+    if ! command -v $package &> /dev/null; then
+        echo "$package is not installed. Installing $package using apt..."
+        if [ "$yes_flag" = true ]; then
             sudo apt update
-            sudo apt install git
+            sudo apt install $package -y
+        else
+            read -p "Do you want to install $package? (y/n): " install_package
+            if [[ "$install_package" =~ ^[Yy]$ ]]; then
+                sudo apt update
+                sudo apt install $package -y
+            fi
         fi
-    fi
-else
-    echo "Git installation found."
-fi
-
-# Check if Python 3 is installed
-if ! command -v python3 &> /dev/null; then
-    echo "Python 3 is not installed. Installing python3 using apt..."
-    
-    if [ "$yes_flag" = true ]; then
-        sudo apt update
-        sudo apt install python3 -y
     else
-        read -p "Do you want to install python3? (y/n): " install_python3
-        if [ "$install_python3" = "y" ]; then
-            sudo apt update
-            sudo apt install python3
-        fi
+        echo "$package installation found."
     fi
-else
-    echo "Python 3 installation found."
-fi
+}
 
-# Check if smbclient is installed
-if ! command -v smbclient &> /dev/null; then
-    echo "smbclient is not installed. Installing smbclient using apt..."
+# Install required packages
+install_package git
+install_package python3
+install_package smbclient
 
-    if [ "$yes_flag" = true ]; then
-        sudo apt update
-        sudo apt install smbclient -y
-    else
-        read -p "Do you want to install smbclient? (y/n): " install_smbclient
-        if [ "$install_smbclient" = "y" ]; then
-            sudo apt update
-            sudo apt install smbclient
-        fi
-    fi
-else
-    echo "smbclient installation found."
-fi
-
+# Create a symbolic link for picam
 script_path=$(pwd)/cam.py
 
-# Try creating the symbolic link using sudo
 if sudo ln -s $script_path /usr/local/bin/picam 2>/dev/null; then
     echo "Symbolic link 'picam' successfully created in /usr/local/bin."
 else
     link_status=$?
     if [ $link_status -eq 1 ]; then
-      # check if it points to the same file
-      if [ "$(readlink /usr/local/bin/picam)" = "$script_path" ]; then
-          echo "Symbolic link 'picam' already exists in /usr/local/bin. Nothing to do."
-      else
-        # delete the existing link and create a new one
-        sudo rm /usr/local/bin/picam
-        sudo ln -s $script_path /usr/local/bin/picam
-        echo "Symbolic link 'picam' successfully created in /usr/local/bin."
-      fi
-
+        if [ "$(readlink /usr/local/bin/picam)" = "$script_path" ]; then
+            echo "Symbolic link 'picam' already exists in /usr/local/bin. Nothing to do."
+        else
+            sudo rm /usr/local/bin/picam
+            sudo ln -s $script_path /usr/local/bin/picam
+            echo "Symbolic link 'picam' successfully created in /usr/local/bin."
+        fi
     else
         echo "Failed to create symbolic link. Please check the script path and try again."
     fi
 fi
-
 
 # Initialize the list of groups the user is not part of
 missing_groups=()
@@ -166,7 +133,10 @@ else
     echo "User is already part of all required groups."
 fi
 
-echo Installing python dependencies...
+echo "Installing python dependencies..."
+
+# Initialize the list of missing libraries
+missing_libs=()
 
 # Check if opencv is installed
 if ! python3 -c "import cv2" &> /dev/null; then
@@ -183,6 +153,7 @@ if ! python3 -c "import re; import numpy; assert re.match(r'1\.26\.\d+', numpy._
 else
     echo "numpy 1.26.x installation found."
 fi
+
 # Check if pandas is installed
 if ! python3 -c "import pandas" &> /dev/null; then
     echo "pandas is not installed."
@@ -262,7 +233,7 @@ Enter your choice (1/2/3): " smbcred_choice
         2)
             echo
             echo "NOTE: It is recommended to have a dedicated NAS user with limited rights"
-            echo "    to be created for that purpose as credentials will be store as plain text"
+            echo "    to be created for that purpose as credentials will be stored as plain text"
             echo
             read -p "Enter NAS username: " smb_username
             read -s -p "Enter NAS password: " smb_password
@@ -286,6 +257,7 @@ else
         sudo chmod 600 /etc/.smbpicreds
         sudo chown $USER:$USER /etc/.smbpicreds
         echo "Credential file permissions updated."
+    fi
 fi
 
 # Modify /etc/dphys-swapfile
@@ -293,13 +265,12 @@ echo "Extending swap size to 2GB..."
 # It should be 3GB but in practice it is limited to 2GB
 sudo sed -i 's/^CONF_SWAPSIZE=.*/CONF_SWAPSIZE=3072/' /etc/dphys-swapfile
 
+# Add specific sudo privileges for the current user
 current_user=$(whoami)
 sudoers_entry="${current_user} ALL=(ALL) NOPASSWD: /sbin/poweroff, /sbin/halt, /sbin/reboot, /bin/mount, /bin/umount"
 
 echo "Adding specific sudo privileges for the current user..."
-echo "$sudoers_entry" | sudo tee -a /etc/sudoers.d/$current_user > /dev/null
+echo "$sudoers_entry" | sudo tee /etc/sudoers.d/$current_user > /dev/null
 
-echo
 echo
 echo "Installation done. Please reboot to apply all the changes."
-
