@@ -29,7 +29,7 @@ from pathlib import Path
 
 import src.NPImage as npi
 from src.log import Logger
-
+from src.upload_manager import SMBManager, SSHManager
 from src.analyse import Analyser
 
 '''
@@ -68,10 +68,30 @@ class Recorder:
         # Remark : the directory is created on the NAS before initializing the camera
         # If the camera is initialized first, it produces only black frames...
         # It is weird, but at least it works like that
+
+        self.uploader = None
         if self.parameters["use_samba"]:
-            self.smb_output = self.create_tree_structure("smb")
+            self.uploader = SMBManager(nas_server=self.parameters["nas_server"],
+                                       share_name=self.parameters["share_name"],
+                                       credentials_file=self.parameters["credentials_file"],
+                                       working_dir=self.parameters["smb_dir"],
+                                       recording_name=self.parameters["recording_name"],
+                                       logger=self.logger)
         elif self.parameters["use_ssh"]:
-            self.ssh_output = self.create_tree_structure("ssh")
+            # Not implemented yet, print some warning and quit
+            self.logger.log("SSH upload not implemented yet", log_level=1)
+            print("SSH upload not implemented yet")
+
+            return
+            # self.uploader = SSHManager(ssh_server=self.parameters["ssh_server"],
+            #                            ssh_user=self.parameters["ssh_user"],
+            #                            ssh_password=self.parameters["ssh_password"],
+            #                            working_dir=self.ssh_output,
+            #                            logger=self.logger)
+
+
+
+        self.uploader.start()
 
         # Create the camera object with the input parameters
         self.camera = Camera(parameters=self.parameters)
@@ -176,8 +196,7 @@ class Recorder:
         # self.create_output_folder()
 
         if self.parameters["use_samba"] and self.is_it_useful_to_save_logs():
-            self.async_smbupload(file_to_upload=self.logger.get_log_file_path(),
-                                 filename_at_destination=self.logger.get_log_filename())
+            self.upload_logs()
 
         # Main recording loop
         for self.current_frame_number in range(self.parameters["start_frame"], self.n_frames_total):
@@ -255,24 +274,32 @@ class Recorder:
                     if self.is_time_for_compression():
                         # self.logger.log("time for compression")
                         self.logger.log("Time for compression", log_level=3)
-                        self.start_async_compression_and_upload(format="mkv")
+                        self.uploader.start_async_compression_and_upload(dir_to_compress=self.get_current_dir(),
+                                                                         format="mkv")
 
                         if self.parameters["use_samba"] and self.is_it_useful_to_save_logs():
                             # This is overwhelming for pour NAS CPU if done too often
-                            self.async_smbupload(file_to_upload=self.logger.get_log_file_path(),
-                                                filename_at_destination=self.logger.get_log_filename())
+                            self.upload_logs()
 
                 # create link to last frame
                 self.create_symlink_to_last_frame()
 
                 # print(f'end: {datetime.now() - self.initial_datetime}')
 
-        self.logger.log("Recording done (Timeout reached)", log_level=3)
-        ## DEBUG
-        # avg_time = avg_time / float(self.n_frames_total)
-        #
-        # print("average time over " + str(self.n_frames_total) + " frames is " + str(avg_time) +
-        #       "\nMin : " + str(min_time) + "\nMax : " + str(max_time))
+        # End of recording
+        # Wait for the end of compression
+
+        self.uploader.wait_for_compression()
+
+        self.upload_remaining_files()
+
+        self.logger.log("Recording done (Timeout reached)",begin='\n\n', end='\n\n\n',log_level=3)
+
+        self.upload_logs()
+
+
+
+
 
     def capture_frame(self):
         # That is the new method, not crashing
@@ -403,360 +430,192 @@ class Recorder:
         except ZeroDivisionError as e:
             return False
 
-    def start_async_compression_and_upload(self, format):
-        dir_to_compress = self.get_current_dir()
-        self.logger.log(f'Compressing and uploading {dir_to_compress}, with format {format}', log_level=5)
-        # log("Dest path : %s " % output_folder)
-        # self.save_process.join()
-        self.compress_process = multiprocessing.Process(target=self.compress_and_upload,
-                                                        args=(dir_to_compress, format,))
-        self.compress_process.start()
-
-    def compress_and_upload(self, folder_name, format):
-        # self.logger.log("start compression")
-        compressed_file = self.compress(folder_name=folder_name, format=format)
-
-        # Check if the file has been created
-        if not os.path.exists(compressed_file):
-            # The compression failed
-            self.logger.log("Compression failed", log_level=1)
-        else:
-            # The compression was successful
-            # Remove the original folder
-
-            # The data are now saved as a movie, it is better to delete the pictures to avoid saturating the disk
-            # in case of failed upload
-            subprocess.run(['rm', '-rf', '%s' % folder_name])
 
 
 
-        # TODO: need to disentangle this mess (compression, analysis, upload)
-
-
-        analyser = Analyser(logger=self.logger)
-        output_files = []
-
-        if self.parameters["compute_chemotaxis"]:
-            output_files = analyser.run(video_path=compressed_file)
-
-        else:
-            self.logger.log("Skipping Analysis", log_level=5)
-            output_files = [compressed_file]
-
-        self.logger.log(f"Output files : {output_files}", log_level=5)
-
-        if self.parameters["use_samba"] is True or self.parameters["use_ssh"] is True:
-            file_to_upload = compressed_file
-            print(f"#DEBUG uploading {file_to_upload}")
-            ok = False
-            n_trials = 0
-            try:
-                while self.upload_failed(file_to_upload):
-                    self.logger.log("Uploading...", log_level=3)
-                    print(f"#DEBUG uploading {file_to_upload}, trial {n_trials}")
-                    if self.parameters["use_samba"]:
-                        ok = self.smbupload(file_to_upload=file_to_upload)
-                        if self.parameters["compute_chemotaxis"]:
-                            for file in output_files:
-                                ok = self.smbupload(file_to_upload=file)
-                    elif self.parameters["use_ssh"]:
-                        ok = self.sshupload(file_to_upload=file_to_upload)
-                        if self.parameters["compute_chemotaxis"]:
-                            for file in output_files:
-                                ok = self.sshupload(file_to_upload=file)
-                    n_trials = n_trials + 1
-
-                    if n_trials > 5:
-                        print(f"#DEBUG ulpoad failed {n_trials} times")
-                        self.logger.log("Upload failed", log_level=1)
-                        raise TimeoutError("Uplaod failed")
-
-                self.logger.log("Upload successful")
-                # TODO : Maybe add check on NAS to confirm sucessful upload
-                self.logger.log("Deleting local files")
-                # Delete video file
-                subprocess.run(['rm', '-rf', '%s.%s' % (folder_name, format)])
-
-                for file in output_files:
-                    subprocess.run(['rm', '-rf', file])
-
-            except TimeoutError as e:
-                self.logger.log(e)
-
-                # TODO : handle files that have not been uploaded
-            # subprocess.run(['rm', '-rf', '%s.tgz' % folder_name])
-            # else:
-            # TODO handle that better
-            # log("something went wrong wile uploading")
-            # raise Exception
-
-        # self.logger.log("compression done")
 
     def delete_local_files(self, folder_name):
         subprocess.run(['rm', '-rf', '%s' % folder_name])
         subprocess.run(['rm', '-rf', '%s.tgz' % folder_name])
 
-    def file_exists_remote(self, user, host, file_path):
-        command = f'test -e {file_path}'
-        result = subprocess.run(['ssh', f'{user}@{host}', command], capture_output=True)
 
-        # Check the return code
-        return result.returncode == 0
-
-    def upload_failed(self, uploaded_file):
-        if self.parameters["use_samba"]:
-            success, out_str = self.smbcommand("ls")  # Receive the tuple
-            # Decode is not needed anymore as we already specify text=True in subprocess.run
-            return uploaded_file not in out_str if success else True
-        elif self.parameters["use_ssh"]:
-            user = os.getlogin()
-            out_str = subprocess.run(['ssh', f'{user}@{self.parameters["ssh_destination"]}',
-                                      'ls', self.ssh_output], capture_output=True).stdout.decode("utf-8")
-            print(f'ssh {user}@{self.parameters["ssh_destination"]} ls {self.ssh_output}')
-            print(out_str)
-            return uploaded_file not in out_str
-
-    def compress(self, folder_name, format="tgz"):
-
-        self.logger.log(f'Compressing {folder_name} to {format}', log_level=5)
-
-        pid = psutil.Process(os.getpid())
-        pid.nice(19)
-
-        if format == "tgz":
-            output_file = '%s.tgz' % folder_name
-            call_args = ['tar', '--xattrs', '-czf', output_file, '-C', '%s' % folder_name, '.']
-        else:
-            input_files = str(pathlib.Path(folder_name).absolute()) + '/*.jpg'
-            output_file = '%s.mkv' % folder_name
-            call_args = ['ffmpeg', '-r', '25', '-pattern_type', 'glob', '-i',
-                         input_files, '-vcodec', 'libx264',
-                         '-crf', '22', '-y',
-                         '-refs', '2', '-preset', 'veryfast', '-profile:v',
-                         'main', '-threads', '4', '-hide_banner',
-                         '-loglevel', 'warning', output_file]
-
-        args_string = ' '.join(call_args)
-        self.logger.log(f'Running command : {args_string}', log_level=5)
-
-
-        subprocess.run(call_args, stdout=subprocess.DEVNULL)
-
-        self.logger.log("Compression of %s done" % folder_name, begin="\n")
-
-        return output_file
-
-    def async_smbupload(self, file_to_upload, filename_at_destination=""):
-        upload_proc = multiprocessing.Process(target=self.smbupload,
-                                              args=(file_to_upload, filename_at_destination))
-        upload_proc.start()
-
-    def smbupload(self, file_to_upload, filename_at_destination=""):
-        self.logger.log(f'Uploading {file_to_upload} to {filename_at_destination}', log_level=5)
-        if file_to_upload is not None:
-            command = f'put {file_to_upload} {filename_at_destination}'
-            ok = self.smbcommand(command)
-
-            extension = pathlib.Path(file_to_upload).suffix
-
-            if ok and extension == ".tgz":
-                # print(ok)
-                try:
-                    os.remove(file_to_upload)
-                except OSError as e:
-                    self.logger.log("Error: %s - %s." % (e.filename, e.strerror))
-
-            return ok
-        return True
-
-    def sshupload(self, file_to_upload, filename_at_destination=""):
-
-        self.logger.log(
-            f'Uploading {file_to_upload} to {self.parameters["ssh_destination"]}:{self.ssh_output}/{filename_at_destination}',
-            log_level=5)
-
-        # Check if file_to_upload is not None
-        if file_to_upload is not None:
-            # Get the current user's login name
-            user = os.getlogin()
-            # Start the scp process
-            process = self.start_scp_process(file_to_upload, filename_at_destination, user)
-
-            # Check if the process was successfully started
-            if process:
-                # Monitor network speed while the process is running
-                self.monitor_network_speed(process)
-                # Communicate with the process and get stdout and stderr
-                stdout, stderr = process.communicate()
-                # Check the return code of the process
-                if process.returncode != 0:
-                    # Log an error message if the process returned a non-zero code
-                    self.logger.log(f'Error occurred during scp: {stderr}', begin="\n    ERROR    ", end="\n\n",
-                                    log_level=1)
-                    return False
-
-                # Check if the file has a .tgz extension
-                extension = pathlib.Path(file_to_upload).suffix
-                if extension == ".tgz":
-                    # Remove the uploaded file if it has a .tgz extension
-                    self.remove_uploaded_file(file_to_upload)
-
-                # Return True if the process completed successfully
-                return True
-            else:
-                # Return False if the process failed to start
-                return False
-        # Return True if file_to_upload is None
-        return True
-
-    def start_scp_process(self, file_to_upload, filename_at_destination, user):
-        try:
-            # Start the scp process using subprocess.Popen
-            process = subprocess.Popen(
-                ['scp',
-                 file_to_upload,
-                 f'{user}@{self.parameters["ssh_destination"]}:{self.ssh_output}/{filename_at_destination}'],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
-            # Return the process object if successful
-            return process
-        except Exception as e:
-            # Log an error message if an exception occurs
-            self.logger.log(f'Error occurred while starting scp process: {e}', begin="\n    ERROR    ", end="\n\n",
-                            log_level=1)
-            # Return None if an exception occurs
-            return None
-
-    def monitor_network_speed(self, process):
-        # Get the start time
-        start_time = time.time()
-        # Loop indefinitely
-        while True:
-            # Check if the process is still running
-            if process.poll() is not None:
-                # Break the loop if the process has terminated
-                break
-
-            # Calculate the network speed
-            network_speed = psutil.net_io_counters().bytes_sent / (1024 * (time.time() - start_time))
-
-            # Log the network speed
-            self.logger.log(f'Network speed: {network_speed:.2f} KB/s', log_level=5)
-
-            # Check if the network speed is less than 1 KB/s and more than 10 seconds have passed
-            if network_speed < 1 and time.time() - start_time > 10:
-                # Log an error message and terminate the process if the conditions are met
-                self.logger.log(f'Network speed is less than 1 KB/s for more than 10 seconds. Stopping process.',
-                                begin="\n    ERROR    ", end="\n\n", log_level=1)
-                process.terminate()
-                # Break the loop
-                break
-
-            # Sleep for 0.1 seconds before checking again
-            time.sleep(0.1)
-
-    def remove_uploaded_file(self, file_to_upload):
-        try:
-            # Remove the uploaded file using os.remove
-            os.remove(file_to_upload)
-        except OSError as e:
-            # Log an error message if an exception occurs
-            self.logger.log("Error: %s - %s." % (e.filename, e.strerror))
-
-    def create_tree_structure(self, protocol):
-        self.logger.log(f"Creating tree structure with {protocol} protocol", log_level=5)
-        try:
-            folder1 = f'{(datetime.now()).strftime("%Y%m%d_%H%M")}_{self.parameters["recording_name"]}'
-        except:
-            folder1 = (datetime.now()).strftime("%Y%m%d_%H%M")
-        folder2 = gethostname()
-
-        if protocol == "smb":
-            self.smbcommand(command=f'mkdir {folder1}', working_dir=self.parameters["smb_dir"])
-            self.smbcommand(command=f'mkdir {folder1}/{folder2}', working_dir=self.parameters["smb_dir"])
-
-            self.logger.log(f'Created folder {folder1}/{folder2} in {self.parameters["smb_dir"]}', log_level=5)
-
-            return f'{self.parameters["smb_dir"]}/{folder1}/{folder2}'
-        if protocol == "ssh":
-            user = os.getlogin()
-            command = f'mkdir -p {self.parameters["ssh_dir"]}/{folder1}/{folder2}'
-            print(command)
-            # self.sshcommand(command=f'mkdir {folder1}', working_dir=self.parameters["ssh_dir"])
-            self.sshcommand(command=command)
-
-            self.logger.log(f'Created folder {folder1}/{folder2} in {self.parameters["ssh_dir"]}', log_level=5)
-
-            return f'{self.parameters["ssh_dir"]}/{folder1}/{folder2}'
-
-    def smbcommand(self, command, working_dir=None):
-        if working_dir is None:
-            working_dir = self.smb_output
-
-        try:
-            smb_full_command = (f'smbclient '
-                                f'{self.parameters["smb_service"]} '
-                                f'-W {self.parameters["workgroup"]} '
-                                f'-A {self.parameters["credentials_file"]} '
-                                f'-D {working_dir} -'
-                                f'c {command}')
-
-            self.logger.log(f'Executing command : {smb_full_command}', log_level=5)
-            result = subprocess.run(
-                ['smbclient',
-                 f'{self.parameters["smb_service"]}',
-                 '-W', f'{self.parameters["workgroup"]}',
-                 '-A', f'{self.parameters["credentials_file"]}',
-                 '-D', f'{working_dir}',
-                 '-c', f'{command}'],
-                capture_output=True, text=True)
-        except Exception as e:
-            self.logger.log(e)
-            return False  # Assuming you want to return False when an exception is caught
-
-        # Log or print stdout and stderr
-        # Note: Handling the case where stdout and stderr are said to be inverted
-        if result.stdout and command != "ls":
-            # Handle specific SMB warning
-            if result.stdout.startswith("NT_STATUS_OBJECT_NAME_COLLISION"):
-                self.logger.log("SMB INFO: " + result.stdout, log_level=3)
-            else:
-                self.logger.log("\nSMB Error:\n" + result.stdout, log_level=1)
-        if result.stderr:
-            self.logger.log("SMB Output:\n" + result.stderr, log_level=6)
-
-        return result.returncode == 0, result.stdout
-
-    def sshcommand(self, command, working_dir=None):
-        user = os.getlogin()
-        # if working_dir is None:
-        #     working_dir = self.ssh_output
-
-        ok = False
-        try:
-            self.logger.log(f'Executing command : {command}', log_level=5)
-            self.logger.log(f'Running command : ssh {user}@{self.parameters["ssh_destination"]} {command}', log_level=5)
-
-            ok = subprocess.run(
-                ['ssh',
-                 f'{user}@{self.parameters["ssh_destination"]}',
-                 command],
-                capture_output=False,
-                timeout=0.5)  # Timeout set to 0.5 seconds
-
-            self.logger.log(f'Subprocess return code : {ok.returncode}', log_level=5)
-
-        except TimeoutExpired:
-            self.logger.log(f'Timeout expired while executing command: {command}', log_level=1)
-            self.logger.log(f'Maybe try to first connect to the server with ssh'
-                            f'{user}@{self.parameters["ssh_destination"]}', log_level=1)
-
-            self.logger.log(f'ERROR: output folder not accessible', begin="\n    ERROR    ", end="\n\n", log_level=1)
-            return False
-        except Exception as e:
-            self.logger.log(e)
-        return ok
+    # def file_exists_remote(self, user, host, file_path):
+    #     command = f'test -e {file_path}'
+    #     result = subprocess.run(['ssh', f'{user}@{host}', command], capture_output=True)
+    #
+    #     # Check the return code
+    #     return result.returncode == 0
+    #
+    #
+    #
+    # def sshupload(self, file_to_upload, filename_at_destination=""):
+    #
+    #     self.logger.log(
+    #         f'Uploading {file_to_upload} to {self.parameters["ssh_destination"]}:{self.ssh_output}/{filename_at_destination}',
+    #         log_level=5)
+    #
+    #     # Check if file_to_upload is not None
+    #     if file_to_upload is not None:
+    #         # Get the current user's login name
+    #         user = os.getlogin()
+    #         # Start the scp process
+    #         process = self.start_scp_process(file_to_upload, filename_at_destination, user)
+    #
+    #         # Check if the process was successfully started
+    #         if process:
+    #             # Monitor network speed while the process is running
+    #             self.monitor_network_speed(process)
+    #             # Communicate with the process and get stdout and stderr
+    #             stdout, stderr = process.communicate()
+    #             # Check the return code of the process
+    #             if process.returncode != 0:
+    #                 # Log an error message if the process returned a non-zero code
+    #                 self.logger.log(f'Error occurred during scp: {stderr}', begin="\n    ERROR    ", end="\n\n",
+    #                                 log_level=1)
+    #                 return False
+    #
+    #             # Check if the file has a .tgz extension
+    #             extension = pathlib.Path(file_to_upload).suffix
+    #             if extension == ".tgz":
+    #                 # Remove the uploaded file if it has a .tgz extension
+    #                 self.remove_uploaded_file(file_to_upload)
+    #
+    #             # Return True if the process completed successfully
+    #             return True
+    #         else:
+    #             # Return False if the process failed to start
+    #             return False
+    #     # Return True if file_to_upload is None
+    #     return True
+    #
+    # def start_scp_process(self, file_to_upload, filename_at_destination, user):
+    #     try:
+    #         # Start the scp process using subprocess.Popen
+    #         process = subprocess.Popen(
+    #             ['scp',
+    #              file_to_upload,
+    #              f'{user}@{self.parameters["ssh_destination"]}:{self.ssh_output}/{filename_at_destination}'],
+    #             stdout=subprocess.PIPE,
+    #             stderr=subprocess.PIPE
+    #         )
+    #         # Return the process object if successful
+    #         return process
+    #     except Exception as e:
+    #         # Log an error message if an exception occurs
+    #         self.logger.log(f'Error occurred while starting scp process: {e}', begin="\n    ERROR    ", end="\n\n",
+    #                         log_level=1)
+    #         # Return None if an exception occurs
+    #         return None
+    #
+    # def monitor_network_speed(self, process):
+    #     # Get the start time
+    #     start_time = time.time()
+    #     # Loop indefinitely
+    #     while True:
+    #         # Check if the process is still running
+    #         if process.poll() is not None:
+    #             # Break the loop if the process has terminated
+    #             break
+    #
+    #         # Calculate the network speed
+    #         network_speed = psutil.net_io_counters().bytes_sent / (1024 * (time.time() - start_time))
+    #
+    #         # Log the network speed
+    #         self.logger.log(f'Network speed: {network_speed:.2f} KB/s', log_level=5)
+    #
+    #         # Check if the network speed is less than 1 KB/s and more than 10 seconds have passed
+    #         if network_speed < 1 and time.time() - start_time > 10:
+    #             # Log an error message and terminate the process if the conditions are met
+    #             self.logger.log(f'Network speed is less than 1 KB/s for more than 10 seconds. Stopping process.',
+    #                             begin="\n    ERROR    ", end="\n\n", log_level=1)
+    #             process.terminate()
+    #             # Break the loop
+    #             break
+    #
+    #         # Sleep for 0.1 seconds before checking again
+    #         time.sleep(0.1)
+    #
+    # def remove_uploaded_file(self, file_to_upload):
+    #     try:
+    #         # Remove the uploaded file using os.remove
+    #         os.remove(file_to_upload)
+    #     except OSError as e:
+    #         # Log an error message if an exception occurs
+    #         self.logger.log("Error: %s - %s." % (e.filename, e.strerror))
+    #
+    # def create_tree_structure(self, protocol):
+    #     self.logger.log(f"Creating tree structure with {protocol} protocol", log_level=5)
+    #     try:
+    #         folder1 = f'{(datetime.now()).strftime("%Y%m%d_%H%M")}_{self.parameters["recording_name"]}'
+    #     except:
+    #         folder1 = (datetime.now()).strftime("%Y%m%d_%H%M")
+    #     folder2 = gethostname()
+    #
+    #     if protocol == "smb":
+    #         #self.smbcommand(command=f'mkdir {folder1}', working_dir=self.parameters["smb_dir"])
+    #         #self.smbcommand(command=f'mkdir {folder1}/{folder2}', working_dir=self.parameters["smb_dir"])
+    #
+    #         #self.logger.log(f'Created folder {folder1}/{folder2} in {self.parameters["smb_dir"]}', log_level=5)
+    #
+    #         return f'{self.parameters["smb_dir"]}/{folder1}/{folder2}'
+    #     if protocol == "ssh":
+    #         user = os.getlogin()
+    #         command = f'mkdir -p {self.parameters["ssh_dir"]}/{folder1}/{folder2}'
+    #         print(command)
+    #         # self.sshcommand(command=f'mkdir {folder1}', working_dir=self.parameters["ssh_dir"])
+    #         self.sshcommand(command=command)
+    #
+    #         self.logger.log(f'Created folder {folder1}/{folder2} in {self.parameters["ssh_dir"]}', log_level=5)
+    #
+    #         return f'{self.parameters["ssh_dir"]}/{folder1}/{folder2}'
+    #
+    # def upload_failed(self, uploaded_file):
+    #     if self.parameters["use_samba"]:
+    #
+    #         upload_ok = self.uploader.upload(file_to_upload=uploaded_file, async_upload=False)
+    #         print(f'#DEBUG upload_ok : {upload_ok}')
+    #         return not upload_ok
+    #
+    #         # success, out_str = self.smbcommand("ls")  # Receive the tuple
+    #         # # Decode is not needed anymore as we already specify text=True in subprocess.run
+    #         # return uploaded_file not in out_str if success else True
+    #     elif self.parameters["use_ssh"]:
+    #         user = os.getlogin()
+    #         out_str = subprocess.run(['ssh', f'{user}@{self.parameters["ssh_destination"]}',
+    #                                   'ls', self.ssh_output], capture_output=True).stdout.decode("utf-8")
+    #         print(f'ssh {user}@{self.parameters["ssh_destination"]} ls {self.ssh_output}')
+    #         print(out_str)
+    #         return uploaded_file not in out_str
+    #
+    # def sshcommand(self, command, working_dir=None):
+    #     user = os.getlogin()
+    #     # if working_dir is None:
+    #     #     working_dir = self.ssh_output
+    #
+    #     ok = False
+    #     try:
+    #         self.logger.log(f'Executing command : {command}', log_level=5)
+    #         self.logger.log(f'Running command : ssh {user}@{self.parameters["ssh_destination"]} {command}', log_level=5)
+    #
+    #         ok = subprocess.run(
+    #             ['ssh',
+    #              f'{user}@{self.parameters["ssh_destination"]}',
+    #              command],
+    #             capture_output=False,
+    #             timeout=0.5)  # Timeout set to 0.5 seconds
+    #
+    #         self.logger.log(f'Subprocess return code : {ok.returncode}', log_level=5)
+    #
+    #     except TimeoutExpired:
+    #         self.logger.log(f'Timeout expired while executing command: {command}', log_level=1)
+    #         self.logger.log(f'Maybe try to first connect to the server with ssh'
+    #                         f'{user}@{self.parameters["ssh_destination"]}', log_level=1)
+    #
+    #         self.logger.log(f'ERROR: output folder not accessible', begin="\n    ERROR    ", end="\n\n", log_level=1)
+    #         return False
+    #     except Exception as e:
+    #         self.logger.log(e)
+    #     return ok
 
     def create_symlink_to_last_frame(self):
 
@@ -785,6 +644,7 @@ class Recorder:
             pass
 
         os.chdir(self.parameters["local_tmp_dir"])
+        return os.getcwd()
 
     def get_pause_mode(self):
         if self.parameters["record_for_s"] == 0 or self.parameters["record_every_h"] == 0:
@@ -909,6 +769,56 @@ class Recorder:
         if self.parameters["timeout"] == 0:
             return True
         return False
+
+    def upload_logs(self):
+        self.uploader.upload(file_to_upload=self.logger.get_log_file_path(),
+                             filename_at_destination=self.logger.get_log_filename())
+
+    def upload_remaining_files(self):
+        self.logger.log("Checking if all files are uploaded", log_level=3)
+
+        # Check if there are some not uploaded files
+
+        rec_folder = self.go_to_tmp_recording_folder()
+
+        # Get list of files in the current directory
+        files = os.listdir(rec_folder)
+
+        # Log files that are not uploaded
+        self.logger.log(f"Files not uploaded : {files}", log_level=3)
+
+        # Check if there are any files in the directory
+        if len(files) > 0:
+            for file in files:
+                # Upload the file to the NAS
+                upload_ok = self.uploader.upload(file_to_upload=file, async_upload=False)
+                # When upload is done, and successful, remove the file
+                if upload_ok:
+                    self.logger.log(f"File {file} uploaded successfully, deleting locally", log_level=3)
+                    os.remove(file)
+
+                else:
+                    self.logger.log(f"File {file} not uploaded, keeping it locally", log_level=1)
+                    # Create a folder in the parent folder named after recodring name
+                    local_folder_save = os.path.join('../', self.uploader.remote_dir)
+                    os.makedirs(local_folder_save, exist_ok=True)
+                    # Move the file to the folder
+                    self.logger.log(f"Moving {file} to {local_folder_save}", log_level=3)
+                    os.rename(file, os.path.join(local_folder_save, file))
+
+
+        else:
+            self.logger.log("No files to upload", log_level=3)
+
+
+
+
+##################### OLD SSH UPLOAD FUNCTION #####################
+
+
+
+
+
 
 
 """
