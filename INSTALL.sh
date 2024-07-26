@@ -88,6 +88,7 @@ script_path="$script_dir/cam.py"
 
 if sudo ln -sfn $script_path /usr/local/bin/picam; then
     echo "Symbolic link 'picam' successfully created or updated in /usr/local/bin."
+    echo "New link: $(readlink -f /usr/local/bin/picam)"
 else
     echo "Failed to create symbolic link. Please check the script path and try again."
 fi
