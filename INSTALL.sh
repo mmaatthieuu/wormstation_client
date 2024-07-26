@@ -86,21 +86,10 @@ script_dir=$(dirname "$(realpath "$0")")
 # Create a symbolic link for picam
 script_path="$script_dir/cam.py"
 
-if sudo ln -s $script_path /usr/local/bin/picam 2>/dev/null; then
-    echo "Symbolic link 'picam' successfully created in /usr/local/bin."
+if sudo ln -sfn $script_path /usr/local/bin/picam; then
+    echo "Symbolic link 'picam' successfully created or updated in /usr/local/bin."
 else
-    link_status=$?
-    if [ $link_status -eq 1 ]; then
-        if [ "$(readlink /usr/local/bin/picam)" = "$script_path" ]; then
-            echo "Symbolic link 'picam' already exists in /usr/local/bin. Nothing to do."
-        else
-            sudo rm /usr/local/bin/picam
-            sudo ln -s $script_path /usr/local/bin/picam
-            echo "Symbolic link 'picam' successfully created in /usr/local/bin."
-        fi
-    else
-        echo "Failed to create symbolic link. Please check the script path and try again."
-    fi
+    echo "Failed to create symbolic link. Please check the script path and try again."
 fi
 
 # Initialize the list of groups the user is not part of
