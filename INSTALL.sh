@@ -36,6 +36,14 @@ while getopts ":hy" opt; do
     esac
 done
 
+# Display help and exit if -h flag is used
+if [ "$help_flag" = true ]; then
+    echo "Usage: $(basename $0) [-y] [-h]"
+    echo "  -y    Automatically install dependencies without confirmation."
+    echo "  -h    Display this help message."
+    exit 0
+fi
+
 # Ask for confirmation if -y flag is not used
 if [ "$yes_flag" = false ]; then
     read -p "Do you want to continue? (y/n): " continue_install
@@ -44,14 +52,6 @@ if [ "$yes_flag" = false ]; then
         echo "Installation aborted."
         exit 0
     fi
-fi
-
-# Display help and exit if -h flag is used
-if [ "$help_flag" = true ]; then
-    echo "Usage: $(basename $0) [-y] [-h]"
-    echo "  -y    Automatically install dependencies without confirmation."
-    echo "  -h    Display this help message."
-    exit 0
 fi
 
 # Function to install a package using apt
@@ -64,6 +64,7 @@ install_package() {
             sudo apt install $package -y
         else
             read -p "Do you want to install $package? (y/n): " install_package
+            install_package=${install_package:-y}
             if [[ "$install_package" =~ ^[Yy]$ ]]; then
                 sudo apt update
                 sudo apt install $package -y
@@ -120,8 +121,13 @@ fi
 # If there are missing groups, prompt the user
 if [ ${#missing_groups[@]} -ne 0 ]; then
     echo "You are not part of the following required groups: ${missing_groups[@]}"
-    read -p "Do you want to add yourself to these groups? (y/n): " add_to_groups
-    if [ "$add_to_groups" = "y" ]; then
+    if [ "$yes_flag" = true ]; then
+        add_to_groups="y"
+    else
+        read -p "Do you want to add yourself to these groups? (y/n): " add_to_groups
+        add_to_groups=${add_to_groups:-y}
+    fi
+    if [[ "$add_to_groups" =~ ^[Yy]$ ]]; then
         for group in "${missing_groups[@]}"; do
             sudo usermod -aG $group $USER
         done
@@ -203,7 +209,8 @@ else
         pip3 install "${missing_libs[@]}"
     else
         read -p "Do you want to install the missing libraries? (y/n): " install_libs
-        if [ "$install_libs" = "y" ]; then
+        install_libs=${install_libs:-y}
+        if [[ "$install_libs" =~ ^[Yy]$ ]]; then
             pip3 install "${missing_libs[@]}"
         fi
     fi
@@ -212,11 +219,16 @@ fi
 # Check if /etc/.smbpicreds exists
 if [ ! -f /etc/.smbpicreds ]; then
     echo "No credential file for smbclient was found (/etc/.smbpicreds)."
-    read -p "Do you want to:
-    1. Locate an existing credential file
-    2. Generate /etc/.smbpicreds
-    3. Ignore (Videos will be stored locally)
-Enter your choice (1/2/3): " smbcred_choice
+    if [ "$yes_flag" = true ]; then
+        smbcred_choice="2"
+    else
+        read -p "Do you want to:
+        1. Locate an existing credential file
+        2. Generate /etc/.smbpicreds
+        3. Ignore (Videos will be stored locally)
+    Enter your choice (1/2/3): " smbcred_choice
+        smbcred_choice=${smbcred_choice:-2}
+    fi
 
     case "$smbcred_choice" in
         1)
