@@ -80,8 +80,11 @@ install_package git
 install_package python3
 install_package smbclient
 
+# Get the directory of this script
+script_dir=$(dirname "$(realpath "$0")")
+
 # Create a symbolic link for picam
-script_path=$(pwd)/cam.py
+script_path="$script_dir/cam.py"
 
 if sudo ln -s $script_path /usr/local/bin/picam 2>/dev/null; then
     echo "Symbolic link 'picam' successfully created in /usr/local/bin."
