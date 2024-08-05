@@ -43,7 +43,7 @@ class LED():
         GPIO.output(self.gpio_pin, GPIO.LOW)
         self.is_on = False
 
-    def run_led_timer(self, duration, period, timeout):
+    def run_led_timer(self, duration, period, timeout, blinking=False):
         # Extend the timeout to ensure that the LED timer process runs until the end of the experiment
         timeout = timeout + (period * 2)
 
@@ -69,8 +69,18 @@ class LED():
                 # Sleep to get closer to the activation time
                 time.sleep(remaining_time)
 
-                self.turn_on()  # Turn on the LEDs
-                time.sleep(duration)  # Keep the LEDs on for the specified duration
+                if blinking:
+                    start_duration = time.time()
+                    while time.time() < start_duration + duration:
+                        self.turn_on()  # Turn on the LEDs
+                        time.sleep(1)  # Keep the LEDs on for 1 second
+                        self.turn_off()  # Turn off the LEDs
+                        if time.time() < start_duration + duration:  # Check if still within the duration
+                            time.sleep(1)  # Wait for 1 second
+                else:
+                    self.turn_on()  # Turn on the LEDs
+                    time.sleep(duration)  # Keep the LEDs on for the specified duration
+
                 self.turn_off()  # Turn off the LEDs
 
         # Create a new multiprocessing process that runs the LED control function

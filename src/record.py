@@ -194,7 +194,8 @@ class Recorder:
         if self.optogenetic:
             self.opto_leds.run_led_timer(duration=self.parameters["pulse_duration"],
                                          period=self.parameters["pulse_interval"],
-                                         timeout=self.parameters["timeout"])
+                                         timeout=self.parameters["timeout"],
+                                         blinking=True)
 
         # self.create_output_folder()
 
