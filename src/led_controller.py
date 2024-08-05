@@ -70,10 +70,14 @@ class LED():
                 time.sleep(remaining_time)
 
                 if blinking:
+                    time.sleep(0.75)
                     start_duration = time.time()
                     while time.time() < start_duration + duration:
+                        # debug : print current time and that led is turned on
+                        print(datetime.now(), "LED ON")
                         self.turn_on()  # Turn on the LEDs
                         time.sleep(1)  # Keep the LEDs on for 1 second
+                        print(datetime.now(), "LED OFF")
                         self.turn_off()  # Turn off the LEDs
                         if time.time() < start_duration + duration:  # Check if still within the duration
                             time.sleep(1)  # Wait for 1 second
