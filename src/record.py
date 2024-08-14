@@ -125,9 +125,9 @@ class Recorder:
 
         self.git_version = git_version
 
-        self.leds = LED(_control_gpio_pin=17, logger=self.logger, name="IR")
+        self.leds = LED(_control_gpio_pin=17, logger=self.logger, name="IR", keep_state=self.preview_only())
         if self.optogenetic:
-            self.opto_leds = LED(_control_gpio_pin=18, logger=self.logger, name="OG")
+            self.opto_leds = LED(_control_gpio_pin=18, logger=self.logger, name="OG",keep_state=self.preview_only())
 
         # subprocess.run(['cpulimit', '-P', '/usr/bin/gzip', '-l', '10', '-b', '-q'])
 
