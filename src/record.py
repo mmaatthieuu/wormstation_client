@@ -157,7 +157,7 @@ class Recorder:
         # TODO : check if samba config is working
         # TODO : clean tmp local dir
 
-        print("#DEBUG Starting recording")
+        #print("#DEBUG Starting recording")
 
         # Go to home directory
         self.go_to_tmp_recording_folder()
@@ -176,9 +176,9 @@ class Recorder:
             #                                    period=self.parameters["time_interval"],
             #                                    timeout=self.parameters["timeout"])
             # Todo check that
-            print("#DEBUG Starting LED timer with duration %f, period %f, timeout %f" % (self.parameters["illumination_pulse"]/1000,
-                                                                                  self.parameters["time_interval"],
-                                                                                  self.parameters["timeout"]))
+            #print("#DEBUG Starting LED timer with duration %f, period %f, timeout %f" % (self.parameters["illumination_pulse"]/1000,
+            #                                                                      self.parameters["time_interval"],
+            #                                                                      self.parameters["timeout"]))
             self.leds.run_led_timer(duration=self.parameters["illumination_pulse"]/1000,
                                     period=self.parameters["time_interval"],
                                     timeout=self.parameters["timeout"])
@@ -679,8 +679,8 @@ class Recorder:
         self.logger.log("Recording resumed")
 
     def compute_total_number_of_frames(self):
-        print("#DEBUG entered compute_total_number_of_frames")
-        print(self.pause_mode)
+        #print("#DEBUG entered compute_total_number_of_frames")
+        #print(self.pause_mode)
         n_frames = 0
         try:
             if not self.pause_mode:
@@ -701,22 +701,22 @@ class Recorder:
         except ZeroDivisionError:
             n_frames = 1
         finally:
-            print(f'number of frames : {n_frames}')
+            #print(f'number of frames : {n_frames}')
             return n_frames
 
     def read_output_filename(self):
         f = self.parameters["output_filename"]
-        print("entered read_output_filename")
+        #print("entered read_output_filename")
         if f == "auto":
             return self.get_needed_output_format()
         else:
             return f
 
     def get_needed_output_format(self):
-        print("entered get_needed_output_format")
+        #print("entered get_needed_output_format")
         print(self.n_frames_total)
         digits = int(ceil(log10(self.n_frames_total)))
-        print(digits)
+        #print(digits)
         if digits == 0:
             digits += 1
         return f'%0{digits}d.jpg'
