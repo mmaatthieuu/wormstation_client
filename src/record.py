@@ -161,17 +161,17 @@ class Recorder:
 
         # wait until it is 21h43
         # Define the target time: 21:43
-        target_time = datetime.now().replace(hour=21, minute=43, second=0, microsecond=0)
-
-        # If the target time has already passed today, set it for tomorrow
-        if target_time < datetime.now():
-            target_time = target_time.replace(day=target_time.day + 1)
-
-        # Calculate the time difference between now and the target time
-        time_to_wait = (target_time - datetime.now()).total_seconds()
-
-        # Wait until the specified time
-        time.sleep(time_to_wait)
+        # target_time = datetime.now().replace(hour=21, minute=43, second=0, microsecond=0)
+        #
+        # # If the target time has already passed today, set it for tomorrow
+        # if target_time < datetime.now():
+        #     target_time = target_time.replace(day=target_time.day + 1)
+        #
+        # # Calculate the time difference between now and the target time
+        # time_to_wait = (target_time - datetime.now()).total_seconds()
+        #
+        # # Wait until the specified time
+        # time.sleep(time_to_wait)
 
 
         # Go to home directory
