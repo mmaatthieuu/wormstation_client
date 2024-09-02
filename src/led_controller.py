@@ -20,7 +20,8 @@ class LED():
         self.logger = logger
         self.name = name
 
-        self.blinking_paused = multiprocessing.Event()  # Event to control pausing of blinking
+        # Event to control running of the LED process
+        self.running = multiprocessing.Event()
 
         #self.turn_off()
 
@@ -38,72 +39,120 @@ class LED():
             self.program.join()
 
     def turn_on(self):
-        print(datetime.now(), "LED ON")
+        #print(datetime.now(), "LED ON")
         self.logger.log(f'Turning on {self.name} LED', log_level=5)
         GPIO.output(self.gpio_pin, GPIO.HIGH)
         self.is_on = True
 
     def turn_off(self):
-        print(datetime.now(), "LED OFF")
+        #print(datetime.now(), "LED OFF")
         self.logger.log(f'Turning off {self.name} LED', log_level=5)
         GPIO.output(self.gpio_pin, GPIO.LOW)
         self.is_on = False
 
-    def pause_blinking(self):
+    def pause_process(self):
         """Pause the blinking process."""
         if self.program and self.program.is_alive():
-            self.logger.log(f'Pausing blinking of {self.name} LED', log_level=5)
-            self.blinking_paused.set()  # Set the pause flag
+            if self.logger:
+                self.logger.log(f'Pausing blinking of {self.name} LED', log_level=5)
+            self.running.clear()  # Clear the running flag to pause the process
 
-    def resume_blinking(self):
+    def resume_process(self):
         """Resume the blinking process."""
         if self.program and self.program.is_alive():
-            self.logger.log(f'Resuming blinking of {self.name} LED', log_level=5)
-            self.blinking_paused.clear()  # Clear the pause flag
+            if self.logger:
+                self.logger.log(f'Resuming blinking of {self.name} LED', log_level=5)
+            self.running.set()  # Set the running flag to resume the process
 
-    def run_led_timer(self, duration, period, timeout, blinking=False):
+    # Patterns
+    def turn_on_for_n_sec(self, duration):
+        self.turn_on()
+        time.sleep(duration)
+        self.turn_off()
+
+    def blink(self, total_duration, blink_on_duration, blink_period):
+        end_time = time.time() + total_duration
+
+        off_time = blink_period - blink_on_duration
+
+        while time.time() < end_time:
+            self.turn_on()
+            time.sleep(blink_on_duration)
+            self.turn_off()
+            time.sleep(off_time)
+
+
+    def wait_until_next_activation(self, period, offset):
+        """"
+        Wait until the next activation of the LED based on the period and offset.
+
+        Parameters:
+            - period: The time interval between each activation of the LED, in seconds.
+                It is based on time so if period is 2, it will activate even seconds. If period
+                is one hour, it will activate every hour, at xx:00:00.
+            - offset: The time offset from the time of the activation. It is in seconds.
+                Ex: if period is 2 and offset is -0.25, it will activate 0.25 seconds before the even seconds.
+
+        """
+        current_time = time.time()  # Get the current time
+        # Calculate the time until the next activation of the LED
+        time_until_next_activation = (current_time - offset) % period
+        remaining_time = period - time_until_next_activation
+
+        time.sleep(remaining_time)
+
+
+    def run_led_timer(self, duration, period, timeout, blinking=False, blinking_period=None):
+        """
+        Run a timer to control the LED.
+
+        Parameters:
+        - duration: The duration for which the LED should be on, in seconds (e.g., 0.5 sec).
+        - period: The time interval between each activation of the LED, in seconds (e.g., 2 sec).
+        - timeout: The total time for which the LED should run, in seconds.
+        - blinking: A flag to indicate whether the LED should blink or stay on. It is only for optogenetics.
+            It creates a blinking pattern with a 1-second on and 1-second off cycle, within the specified duration.
+        """
+
         # Extend the timeout to ensure that the LED timer process runs until the end of the experiment
         timeout = timeout + (period * 2)
 
         def led_timer_process():
-            # This function defines a separate process for LED control
-            end_time = time.time() + timeout
-            offset = 0.25
+            """
+            This function defines a separate process for LED control.
+            It manages the LED state (on/off) based on the timing parameters.
+            """
+            end_time = time.time() + timeout  # Calculate the end time for the LED process
 
-            while time.time() < end_time:
-                current_time = time.time()
-                time_until_next_activation = (current_time + offset) % period
-                remaining_time = period - time_until_next_activation
+            # Small offset to ensure alignment with the frame acquisition process.
+            # The LEDs turn on <offset> seconds before the frames are captured. 0.25 sec is a good value.
+            #offset = 0.25
 
-                # Sleep to get closer to the activation time
-                time.sleep(remaining_time)
+            while time.time() < end_time:  # Main loop runs until the timeout is reached
 
-                if blinking:
-                    time.sleep(0.75)
-                    start_duration = time.time()
-                    while time.time() < start_duration + duration:
-                        # Check if blinking is paused
-                        if self.blinking_paused.is_set():
-                            time.sleep(0.1)  # Wait a little while checking if paused
-                            continue
+                # Wait until the process is set to run
+                self.running.wait()  # This will block the loop if the running flag is not set
 
-                        # Turn LEDs on and off as part of the blinking pattern
-                        print(datetime.now(), "LED ON")
-                        self.turn_on()
-                        time.sleep(1)  # Keep the LEDs on for 1 second
-                        print(datetime.now(), "LED OFF")
-                        self.turn_off()
-                        if time.time() < start_duration + duration:
-                            time.sleep(1)  # Wait for 1 second
-                else:
-                    # Check if blinking is paused
-                    if not self.blinking_paused.is_set():
-                        self.turn_on()  # Turn on the LEDs
-                        time.sleep(duration)  # Keep the LEDs on for the specified duration
+                if blinking:  # If the LED should blink, i.e. be disynchronized with the frame acquisition.
+                        self.wait_until_next_activation(period, 0.5)
+                        self.blink(duration, 1, blinking_period)
 
-                self.turn_off()  # Turn off the LEDs
+                else:  # If blinking is not enabled (steady state)
+                    self.wait_until_next_activation(period, -0.25)
+                    self.turn_on_for_n_sec(duration)
+
+        # Ensure any existing process is properly cleaned up before starting a new one
+        if self.program and self.program.is_alive():
+            self.cleanup()
+
+        # Initialize the running flag as True to start the process
+        self.running.set()
 
         # Create a new multiprocessing process that runs the LED control function
         self.program = multiprocessing.Process(target=led_timer_process)
         self.program.start()
+        self.logger.log(f'Started LED timer process for {self.name}', log_level=5)
+
+
+
 

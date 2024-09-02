@@ -94,21 +94,31 @@ def parse_input():
 def sigterm_handler(signal, frame):
     # Handle SIGTERM signal here
     print("Received SIGTERM signal. Stopping recording.")
+    if recorder:
+        recorder.logger.log("Received SIGTERM signal. Stopping recording.", log_level=1)
+        recorder.stop()
+
     sys.exit(0)
+
+
+def sigusr1_handler(signal, frame):
+    # Handler for custom signal to capture a new frame
+    print("Received SIGUSR1 signal. Capturing a new frame.")
+    if recorder:  # Check if the recorder is initialized
+        recorder.logger.log("Received SIGUSR1 signal. Capturing a new frame.", log_level=3)
+        recorder.capture_frame_during_pause()
 
 
 
 def main():
-
-    # Set up signal handler for SIGTERM
+    # Set up signal handlers
     signal.signal(signal.SIGTERM, sigterm_handler)
+    signal.signal(signal.SIGUSR1, sigusr1_handler)  # Custom signal handler for capturing a new frame
 
-    # TODO : take json config as input
     parameters = Parameters(sys.argv[1])
 
+    global recorder
     recorder = Recorder(parameters=parameters, git_version=get_git_version())
-
-    # TODO : save json config
 
     #picamera.PiCamera.CAPTURE_TIMEOUT = 3
 
@@ -132,9 +142,7 @@ def main():
         print("Keyboard interrupt. Stopping recording.")
         del recorder
 
-        if parameters["verbosity_level"]>0:
-            pass
-            #log("Over.")
+
 
     # else:
     #     log("\nOops... Something went wrong.\n")

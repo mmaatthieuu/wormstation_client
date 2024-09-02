@@ -61,6 +61,10 @@ class Recorder:
         self.logger = Logger(verbosity_level=parameters["verbosity_level"], save_log=self.is_it_useful_to_save_logs())
 
         self.logger.log("Initializing recorder", log_level=5)
+        self.logger.log("Git version : %s" % git_version, log_level=3)
+
+        tmp_folder = self.get_tmp_folder() # Path to the temporary folder
+        self.status_file_path = f'{tmp_folder}/status.txt' # Path to the status file
 
         # Log parameters
         self.logger.log(json.dumps(self.parameters, indent=4), log_level=0)
@@ -125,9 +129,11 @@ class Recorder:
 
         self.git_version = git_version
 
-        self.leds = LED(_control_gpio_pin=17, logger=self.logger, name="IR", keep_state=self.preview_only())
+        self.ir_leds = LED(_control_gpio_pin=17, logger=self.logger, name="IR", keep_state=self.preview_only())
+        self.leds = [self.ir_leds]
         if self.optogenetic:
             self.opto_leds = LED(_control_gpio_pin=18, logger=self.logger, name="OG",keep_state=self.preview_only())
+            self.leds.append(self.opto_leds)
 
         # subprocess.run(['cpulimit', '-P', '/usr/bin/gzip', '-l', '10', '-b', '-q'])
 
@@ -138,14 +144,19 @@ class Recorder:
         self.logger.log("Recorder initialized", log_level=5)
 
     def __del__(self):
-        self.logger.log("Closing recorder", log_level=3)
-        # subprocess.run(['pkill', 'cpulimit'])
-        del self.camera
+        self.stop()
 
-        # if not self.preview_only():
-        #     self.leds.turn_off()
-        #     if self.optogenetic:
-        #         self.opto_leds.turn_off()
+    def stop(self):
+
+        for led in self.leds:
+            led.turn_off()
+
+        self.logger.log("Stopping recording", log_level=3)
+
+        self.update_status('Not Running')
+
+        time.sleep(0.2)
+        self.logger.log("Terminated", log_level=3)
 
     def start_recording(self):
         """
@@ -177,6 +188,8 @@ class Recorder:
         # Go to home directory
         self.go_to_tmp_recording_folder()
 
+        self.update_status('Recording')
+
         # Compute the total number of frame from the recording time and time interval between frames
 
         self.camera.pre_callback = self.annotate_frame
@@ -187,22 +200,26 @@ class Recorder:
             # If one does an actual recording and not just a preview (i.e. timeout=0)
             # sync all raspberry pi by acquiring frames every even second
 
-            # self.leds.start_program_in_seconds(duration_of_illumination=self.parameters["illumination_pulse"]/1000,
+            # self.ir_leds.start_program_in_seconds(duration_of_illumination=self.parameters["illumination_pulse"]/1000,
             #                                    period=self.parameters["time_interval"],
             #                                    timeout=self.parameters["timeout"])
             # Todo check that
             #print("#DEBUG Starting LED timer with duration %f, period %f, timeout %f" % (self.parameters["illumination_pulse"]/1000,
             #                                                                      self.parameters["time_interval"],
             #                                                                      self.parameters["timeout"]))
-            self.leds.run_led_timer(duration=self.parameters["illumination_pulse"]/1000,
-                                    period=self.parameters["time_interval"],
-                                    timeout=self.parameters["timeout"])
+            self.ir_leds.run_led_timer(duration=self.parameters["illumination_pulse"] / 1000,
+                                       period=self.parameters["time_interval"],
+                                       timeout=self.parameters["timeout"])
 
-            #self.leds.turn_on()
+            #self.ir_leds.turn_on()
 
             # wait_time, _ = get_remaining_time_to_next_seconds(time.time(),4)
             # time.sleep(wait_time)
             wait_until_next_even_second()
+
+        else:
+            # In case of preview, turn on IR LED to see something
+            self.ir_leds.turn_on()
 
         self.initial_time = time.time()
 
@@ -210,7 +227,8 @@ class Recorder:
             self.opto_leds.run_led_timer(duration=self.parameters["pulse_duration"],
                                          period=self.parameters["pulse_interval"],
                                          timeout=self.parameters["timeout"],
-                                         blinking=True)
+                                         blinking=True,
+                                         blinking_period=self.parameters["time_interval"])
 
         # self.create_output_folder()
 
@@ -300,8 +318,7 @@ class Recorder:
                             # This is overwhelming for pour NAS CPU if done too often
                             self.upload_logs()
 
-                # create link to last frame
-                self.create_symlink_to_last_frame()
+
 
                 # print(f'end: {datetime.now() - self.initial_datetime}')
 
@@ -314,6 +331,9 @@ class Recorder:
 
         self.logger.log("Recording done (Timeout reached)",begin='\n\n', end='\n\n\n',log_level=3)
 
+        # After recording is finished
+        self.update_status('Not Running')
+
         self.upload_logs()
 
 
@@ -325,6 +345,9 @@ class Recorder:
         capture_request = self.camera.capture_request()
         capture_request.save("main", self.get_last_save_path())
         capture_request.release()
+
+        # create link to last frame
+        self.create_symlink_to_last_frame()
 
     def wait_or_catchup_by_skipping_frames(self):
         # Wait
@@ -458,12 +481,16 @@ class Recorder:
         subprocess.run(['rm', '-rf', '%s.tgz' % folder_name])
 
 
-
-    def create_symlink_to_last_frame(self):
-
+    def get_tmp_folder(self):
         # get name of current user
         user = os.getlogin()
         tmp_folder = f'/home/{user}/tmp'
+
+        return tmp_folder
+
+    def create_symlink_to_last_frame(self):
+
+        tmp_folder = self.get_tmp_folder()
 
         # check if tmp folder exists
         if not os.path.exists(tmp_folder):
@@ -497,30 +524,62 @@ class Recorder:
     def is_it_pause_time(self, frame_number):
         if self.pause_mode is False:
             return False
-        number_of_frames_per_batch = self.parameters["record_for_s"] / self.parameters["time_interval"]
+        number_of_frames_per_batch = self.parameters["record_for_s"] // self.parameters["time_interval"]
         if frame_number % number_of_frames_per_batch == 0 and frame_number != 0:
             return True
         else:
             return False
 
     def pause_recording_in_s(self, time_to_pause):
+        """Pause recording for a specified amount of time."""
+        self.update_status('Paused')  # Update status to Paused
         self.logger.log(f"Pausing recording for {time_to_pause} seconds ({time_to_pause / 3600} hours)")
+
         if time_to_pause > 10:
-            time.sleep(5)
-            self.leds.turn_off()  # Turn off LEDs during the pause
-            self.leds.pause_blinking()  # Pause LED blinking
-            time.sleep(time_to_pause - 10)
-            self.leds.resume_blinking()  # Resume LED blinking after the pause
-            self.leds.turn_on()  # Turn LEDs back on
-            time.sleep(5)
+            # If the pause is longer than 10 seconds, turn off the LEDs and pause the LED blinking
+
+            for led in self.leds:
+                led.turn_off()
+                led.pause_process()
+
+            # Do the pause and wait for the remaining time minus 3 seconds
+            time.sleep(time_to_pause - 3)
+
+            # 5 seconds before the end of the pause, turn the LEDs back on
+            for led in self.leds:
+                led.resume_process()
+                # No need to turn them back on here, the process will do it
+
+            self.update_status('Recording')  # Update status back to Recording
+            time.sleep(3)  # Wait for the remaining 3 seconds
             self.pause_number += 1
         else:
+            # no need to stop the LEDs for a short pause
             time.sleep(time_to_pause)
+            self.update_status('Recording')  # Update status back to Recording
+
+
         self.logger.log("Recording resumed")
 
+
+    def update_status(self, status):
+        """Update the status file with the current recording status."""
+        with open(self.status_file_path, 'w') as f:
+            f.write(status)
+
+    def capture_frame_during_pause(self):
+        """Capture a new frame during a recording pause."""
+        self.logger.log("Capturing a new frame during pause", log_level=3)
+        if self.current_frame_number < self.n_frames_total:
+            self.ir_leds.turn_on()
+            time.sleep(0.25)
+            self.capture_frame()
+            self.ir_leds.turn_off()
+            self.logger.log(f"Captured frame {self.current_frame_number} during pause", log_level=3)
+        else:
+            self.logger.log("No frames left to capture", log_level=2)
+
     def compute_total_number_of_frames(self):
-        #print("#DEBUG entered compute_total_number_of_frames")
-        #print(self.pause_mode)
         n_frames = 0
         try:
             if not self.pause_mode:
@@ -528,14 +587,11 @@ class Recorder:
                 if n_frames == 0:
                     n_frames = 1
             else:
-                print("DEBUG WARNING: record_every_h is in minutes, not hours")
                 numer_of_acquisitions = int(self.parameters["timeout"] / (self.parameters["record_every_h"] * 3600))
-                print(f'timeout : {self.parameters["timeout"]}')
-                print(f'record_every_h : {self.parameters["record_every_h"]}')
-                print(f'number of acquisitions : {numer_of_acquisitions}')
+
                 n_frames = int(
-                    self.parameters["record_for_s"] / self.parameters["time_interval"] * numer_of_acquisitions)
-                print(f'number of frames : {n_frames}')
+                    self.parameters["record_for_s"] / self.parameters["time_interval"]) * numer_of_acquisitions
+                #print(f'number of frames : {n_frames}')
                 if n_frames == 0:
                     n_frames = 1
         except ZeroDivisionError:
@@ -554,7 +610,7 @@ class Recorder:
 
     def get_needed_output_format(self):
         #print("entered get_needed_output_format")
-        print(self.n_frames_total)
+        #print(self.n_frames_total)
         digits = int(ceil(log10(self.n_frames_total)))
         #print(digits)
         if digits == 0:
