@@ -18,6 +18,7 @@ echo "    - /etc/.smbpicreds (credential file for smbclient)"
 echo "    - Add current user to 'gpio', 'video' and 'input' groups"
 echo "    - Modify /etc/dphys-swapfile to extend swap size to 2GB"
 echo "    - Add specific sudo privileges for the current user"
+echo "    - Create a udev rule for FT232H"
 echo
 
 # Process command line arguments
@@ -177,6 +178,14 @@ else
     echo "trackpy installation found."
 fi
 
+# Check if pyftdi is installed
+if ! python3 -c "import pyftdi" &> /dev/null; then
+    echo "pyftdi is not installed."
+    missing_libs+=("pyftdi")
+else
+    echo "pyftdi installation found."
+fi
+
 # Check if matplotlib is installed
 if ! python3 -c "import matplotlib" &> /dev/null; then
     echo "matplotlib is not installed."
@@ -276,6 +285,23 @@ sudoers_entry="${current_user} ALL=(ALL) NOPASSWD: /sbin/poweroff, /sbin/halt, /
 
 echo "Adding specific sudo privileges for the current user..."
 echo "$sudoers_entry" | sudo tee /etc/sudoers.d/$current_user > /dev/null
+
+# Create the udev rule for FT232H
+udev_rule_file="/etc/udev/rules.d/99-ftdi.rules"
+udev_rule='SUBSYSTEM=="usb", ATTR{idVendor}=="0403", ATTR{idProduct}=="6014", MODE="0666"'
+
+echo "Adding udev rule for FT232H..."
+if [ -f "$udev_rule_file" ]; then
+    if ! grep -q "$udev_rule" "$udev_rule_file"; then
+        echo "$udev_rule" | sudo tee -a "$udev_rule_file" > /dev/null
+        echo "FT232H udev rule added."
+    else
+        echo "FT232H udev rule already exists."
+    fi
+else
+    echo "$udev_rule" | sudo tee "$udev_rule_file" > /dev/null
+    echo "FT232H udev rule file created and rule added."
+fi
 
 echo
 echo "Installation done. Please reboot to apply all the changes."
