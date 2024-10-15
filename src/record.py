@@ -20,7 +20,7 @@ import psutil
 import pathlib
 
 from src.camera import Camera
-from src.led_controller import LED
+from src.led_controller import LightController
 # from src.tlc5940.tlc import tlc5940
 import os
 import subprocess
@@ -129,11 +129,9 @@ class Recorder:
 
         self.git_version = git_version
 
-        self.ir_leds = LED(_control_gpio_pin=17, logger=self.logger, name="IR", keep_state=self.preview_only())
-        self.leds = [self.ir_leds]
-        if self.optogenetic:
-            self.opto_leds = LED(_control_gpio_pin=18, logger=self.logger, name="OG",keep_state=self.preview_only())
-            self.leds.append(self.opto_leds)
+        # Initialize the LEDs
+        self.lights = LightController()
+
 
         # subprocess.run(['cpulimit', '-P', '/usr/bin/gzip', '-l', '10', '-b', '-q'])
 
@@ -148,8 +146,8 @@ class Recorder:
 
     def stop(self):
 
-        for led in self.leds:
-            led.turn_off()
+        # Turn off all LEDs
+        self.lights.turn_off_all_leds()
 
         self.logger.log("Stopping recording", log_level=3)
 
@@ -168,22 +166,6 @@ class Recorder:
         # TODO : check if samba config is working
         # TODO : clean tmp local dir
 
-        #print("#DEBUG Starting recording")
-
-        # wait until it is 21h43
-        # Define the target time: 21:43
-        # target_time = datetime.now().replace(hour=21, minute=43, second=0, microsecond=0)
-        #
-        # # If the target time has already passed today, set it for tomorrow
-        # if target_time < datetime.now():
-        #     target_time = target_time.replace(day=target_time.day + 1)
-        #
-        # # Calculate the time difference between now and the target time
-        # time_to_wait = (target_time - datetime.now()).total_seconds()
-        #
-        # # Wait until the specified time
-        # time.sleep(time_to_wait)
-
 
         # Go to home directory
         self.go_to_tmp_recording_folder()
@@ -198,16 +180,13 @@ class Recorder:
 
         if not self.preview_only():
             # If one does an actual recording and not just a preview (i.e. timeout=0)
-            # sync all raspberry pi by acquiring frames every even second
 
-            # self.ir_leds.start_program_in_seconds(duration_of_illumination=self.parameters["illumination_pulse"]/1000,
-            #                                    period=self.parameters["time_interval"],
-            #                                    timeout=self.parameters["timeout"])
             # Todo check that
             #print("#DEBUG Starting LED timer with duration %f, period %f, timeout %f" % (self.parameters["illumination_pulse"]/1000,
             #                                                                      self.parameters["time_interval"],
             #                                                                      self.parameters["timeout"]))
-            self.ir_leds.run_led_timer(duration=self.parameters["illumination_pulse"] / 1000,
+
+            self.lights["IR"].run_led_timer(duration=self.parameters["illumination_pulse"] / 1000,
                                        period=self.parameters["time_interval"],
                                        timeout=self.parameters["timeout"])
 
@@ -219,12 +198,13 @@ class Recorder:
 
         else:
             # In case of preview, turn on IR LED to see something
-            self.ir_leds.turn_on()
+            # self.ir_leds.turn_on()
+            self.lights["IR"].turn_on()
 
         self.initial_time = time.time()
 
         if self.optogenetic:
-            self.opto_leds.run_led_timer(duration=self.parameters["pulse_duration"],
+            self.lights["Orange"].run_led_timer(duration=self.parameters["pulse_duration"],
                                          period=self.parameters["pulse_interval"],
                                          timeout=self.parameters["timeout"],
                                          blinking=True,
@@ -354,13 +334,6 @@ class Recorder:
         # Check if the current frame is on time
 
         delay = self.get_delay()
-
-        # print(f'current time - initial time : {time.time() - self.initial_time}')
-        # print(f'1- {self.current_frame_number * self.parameters["time_interval"]}')
-        # print(f'2- {self.pause_number * self.pause_time/self.parameters["time_interval"]}')
-        # print(f'pause time : {self.pause_time}')
-        # print(f'pause number : {self.pause_number}')
-        # print(f'delay : {delay}')
 
         # If too early, wait until it is time to record
         # print(delay)
@@ -537,17 +510,15 @@ class Recorder:
 
         if time_to_pause > 10:
             # If the pause is longer than 10 seconds, turn off the LEDs and pause the LED blinking
+            self.lights.turn_off_all_leds()
+            self.lights.pause_all_leds()
 
-            for led in self.leds:
-                led.turn_off()
-                led.pause_process()
 
             # Do the pause and wait for the remaining time minus 3 seconds
             time.sleep(time_to_pause - 3)
 
             # 5 seconds before the end of the pause, turn the LEDs back on
-            for led in self.leds:
-                led.resume_process()
+            self.lights.resume_all_leds()
                 # No need to turn them back on here, the process will do it
 
             self.update_status('Recording')  # Update status back to Recording
@@ -571,10 +542,12 @@ class Recorder:
         """Capture a new frame during a recording pause."""
         self.logger.log("Capturing a new frame during pause", log_level=3)
         if self.current_frame_number < self.n_frames_total:
-            self.ir_leds.turn_on()
+            # self.ir_leds.turn_on()
+            self.lights["IR"].turn_on()
             time.sleep(0.25)
             self.capture_frame()
-            self.ir_leds.turn_off()
+            # self.ir_leds.turn_off()
+            self.lights["IR"].turn_off()
             self.logger.log(f"Captured frame {self.current_frame_number} during pause", log_level=3)
         else:
             self.logger.log("No frames left to capture", log_level=2)
@@ -679,34 +652,3 @@ class Recorder:
 
 
 
-
-
-
-##################### OLD SSH UPLOAD FUNCTION #####################
-
-
-
-
-
-
-
-"""
-    def is_it_time_for_opto_simulation(self):
-        current_time = time.time()
-        time_from_start = int(current_time - self.initial_time)
-
-        if self.optogenetic == False:
-            return False
-
-        if (time_from_start % self.pulse_interval) <= (time_from_start % self.pulse_duration):
-            return True
-        else:
-            return False
-
-    def do_optostimulation_if_necessary(self):
-        print(self.is_it_time_for_opto_simulation())
-        if self.is_it_time_for_opto_simulation():
-            self.opto_leds.turn_on()
-        else:
-            self.opto_leds.turn_off()
-"""
