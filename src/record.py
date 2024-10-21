@@ -130,7 +130,7 @@ class Recorder:
         self.git_version = git_version
 
         # Initialize the LEDs
-        self.lights = LightController()
+        self.lights = LightController(logger=self.logger)
 
 
         # subprocess.run(['cpulimit', '-P', '/usr/bin/gzip', '-l', '10', '-b', '-q'])
@@ -166,7 +166,6 @@ class Recorder:
         # TODO : check if samba config is working
         # TODO : clean tmp local dir
 
-
         # Go to home directory
         self.go_to_tmp_recording_folder()
 
@@ -177,6 +176,8 @@ class Recorder:
         self.camera.pre_callback = self.annotate_frame
 
         self.camera.start()
+
+
 
         if not self.preview_only():
             # If one does an actual recording and not just a preview (i.e. timeout=0)

@@ -27,7 +27,7 @@ class LightController:
         else:
             # Default LEDs
             self.leds = {
-                "IR": LED(spi_controller=self.spi_controller, channel=0, current='100mA', name='IR', logger=self.logger),
+                "IR": LED(spi_controller=self.spi_controller, channel=0, current='37.5mA', name='IR', logger=self.logger),
                 "Orange": LED(spi_controller=self.spi_controller, channel=1, current='50mA', name='Orange', logger=self.logger),
                 "Blue": LED(spi_controller=self.spi_controller, channel=2, current='37.5mA', name='Blue', logger=self.logger)
             }
@@ -72,7 +72,7 @@ class FT232H:
     def __init__(self, logger=None):
         self.logger = logger
         self.spi = SpiController()
-        self.spi.configure('ftdi://ftdi:232h/1', cs_count=2, frequency=12E6)  # Reserve chip selects
+        self.spi.configure('ftdi://ftdi:232h/1', cs_count=3, frequency=12E6)  # Reserve chip selects
 
         self.vsync_pin = 0x40  # ADBUS6
         self.test_led_pin = 0x80  # ADBUS7
@@ -97,7 +97,21 @@ class LEDDriver:
         self.spi = spi_port
 
         self.current_level = self.read_current_input(current)
+        self.initialize()
+
+    def initialize(self):
+        self.write_register(0x000, 0x01)
+        self.write_register(0x0A9, 0x00)  # Reset chip to default state
+
+        time.sleep(0.001)
+
         self.set_max_current(self.current_level)
+
+        self.write_register(0x001, 0x58)  # Set data mode 1
+        time.sleep(0.001)
+        self.write_register(0x009, 0x7f)  # Set Color Current to 100%
+        self.write_register(0x00A, 0x7f)
+        self.write_register(0x00B, 0x7f)
 
     def set_max_current(self, current_level):
         """Set the maximum current in the Dev_config3 register."""

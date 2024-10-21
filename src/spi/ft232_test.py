@@ -17,7 +17,7 @@ class LP5860T:
         self.write_register(0x0A9, 0x00)  # Reset chip to default state
         time.sleep(0.001)  # Short delay for stability
         self.set_max_current(current_level)
-        self.write_register(0x001, 0x5a)  # Set data mode 1
+        self.write_register(0x001, 0x58)  # Set data mode 1
         time.sleep(0.001)
         self.write_register(0x009, 0x7f)  # Set Color Current to 100%
         self.write_register(0x00A, 0x7f)
@@ -112,33 +112,36 @@ def main():
     spi_controller = SpiController()
 
     # Configure the FT232H interface for SPI and GPIO control
-    spi_controller.configure('ftdi://ftdi:232h/1', cs_count=2)  # Reserve chip selects and GPIO
+    spi_controller.configure('ftdi://ftdi:232h/1', cs_count=3)  # Reserve chip selects and GPIO
 
     # Get SPI port and GPIO controller
     spi_port = spi_controller.get_port(cs=0, freq=12E6, mode=0)  # SPI with /CS on ADBUS3
     gpio = spi_controller.get_gpio()
+    gpio.set_direction(0xc0, 0xc0)  # Set ADBUS4 as an output pin
 
     # Create an LP5860T instance
     device2 = LP5860T(spi_port=spi_port)  # Device on CS0
 
     # Create a Pulser instance to generate VSYNC pulses using GPIO
-    pulser = Pulser(gpio)
-    pulser.start_vsync()
+    # pulser = Pulser(gpio)
+    # pulser.start_vsync()
 
     try:
         while True:
             print("Turning on device 2 (CS0)")
             device2.turn_on()
+            gpio.write(0x80)
             time.sleep(0.5)
             print("Turning off device 2 (CS0)")
             device2.turn_off()
+            gpio.write(0x00)
             time.sleep(0.5)
 
     except KeyboardInterrupt:
         print("Process interrupted by user.")
 
     finally:
-        pulser.stop_vsync()
+        # pulser.stop_vsync()
         spi_controller.close()
 
 
