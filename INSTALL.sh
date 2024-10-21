@@ -4,6 +4,7 @@
 yes_flag=false
 help_flag=false
 
+
 echo "Wormstation-client installation script"
 echo "--------------------------------------"
 echo

@@ -126,7 +126,6 @@ def main():
 
     try:
 
-
         #print("Start recording")
         #profile.runcall(recorder.start_recording,)
         recorder.start_recording()
