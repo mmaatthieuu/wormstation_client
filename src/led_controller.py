@@ -40,10 +40,12 @@ class LightController:
             self.leds = {
                 "IR": LED(usb_handler=self.spi_controller.usb_handler,
                           channel=0, current='100mA', name='IR', logger=self.logger),
+                # Orange LEDs recommended current is 50mA for long term use
                 "Orange": LED(usb_handler=self.spi_controller.usb_handler,
-                              channel=1, current='50mA', name='Orange', logger=self.logger),
+                              channel=1, current='100mA', name='Orange', logger=self.logger),
+                # Blue LEDs recommended current is 37.5mA for long term use
                 "Blue": LED(usb_handler=self.spi_controller.usb_handler,
-                            channel=2, current='37.5mA', name='Blue', logger=self.logger)
+                            channel=2, current='100mA', name='Blue', logger=self.logger)
             }
 
         # Register cleanup with atexit
@@ -108,6 +110,19 @@ class LightController:
         """Terminate all LED programs."""
         for led in self.leds.values():
             led.cleanup()
+
+    def switch_led(self, name: str, state: bool):
+        """Switch an LED on or off based on its name and state."""
+        if name in self.leds:
+            led = self.leds[name]
+            if state:
+                self.logger.log(f"Switching ON {name} LED", log_level=5)
+                led.turn_on()
+            else:
+                self.logger.log(f"Switching OFF {name} LED", log_level=5)
+                led.turn_off()
+        else:
+            self.logger.log(f"LED '{name}' does not exist.", log_level=2)
 
 
 class FT232H:
@@ -379,6 +394,10 @@ class LED:
         self.program = None
         self.running = threading.Event()
 
+    def set_current(self, current):
+        """Set the current for the LED."""
+        self.led_driver.set_max_current(self.led_driver.read_current_input(current))
+
     def turn_on(self):
         self.logger.log(f'Turning on {self.name} LED', log_level=5)
         self.led_driver.set_pwm_brightness(0xFF)
@@ -480,7 +499,7 @@ class LED:
 
 
 class FakeLogger:
-    def log(self, message, log_level=5):
+    def log(self, message, log_level=1):
         print(f"[LOG - Level {log_level}]: {message}")
 
 
@@ -493,6 +512,9 @@ if __name__ == "__main__":
 
     light_controller.turn_off_all_leds()
 
+    # Flag to control the Blue LED alternation
+    blue_led_running = True
+
     # Turn on each LED for 2 seconds using the turn_on_for_n_sec method
     try:
         # Turn on the IR LED for 2 seconds
@@ -501,13 +523,52 @@ if __name__ == "__main__":
         # Turn on the Orange LED for 2 seconds
         light_controller["Orange"].turn_on_for_n_sec(2)
 
-        # Turn on the Blue LED for 2 seconds
-        light_controller["Blue"].turn_on_for_n_sec(2)
+        # Alternate the Blue LED current between 37.5mA and 50mA every 0.5 seconds
+        def alternate_blue_led():
+            while blue_led_running:
+                # Set Blue LED to 37.5mA
+                light_controller.leds["Orange"].led_driver.set_max_current(3)  # 37.5mA
+                light_controller["Orange"].turn_on()
+                time.sleep(0.5)
 
-        light_controller["Blue"].run_led_timer(duration=1, period=5, timeout=20, blinking=True, blinking_period=20)
+                # Check if thread should stop
+                if not blue_led_running:
+                    break
 
-        # wait for program to finish
-        light_controller["Blue"].program.join()
+                # Set Blue LED to 50mA
+                light_controller.leds["Orange"].led_driver.set_max_current(4)  # 50mA
+                light_controller["Orange"].turn_on()
+                time.sleep(0.5)
+
+                # Check if thread should stop
+                if not blue_led_running:
+                    break
+
+                # Set Blue LED to 50mA
+                light_controller.leds["Orange"].led_driver.set_max_current(5)  # 75mA
+                light_controller["Orange"].turn_on()
+                time.sleep(0.5)
+
+                # Check if thread should stop
+                if not blue_led_running:
+                    break
+
+                # Set Blue LED to 50mA
+                light_controller.leds["Orange"].led_driver.set_max_current(6)  # 100mA
+                light_controller["Orange"].turn_on()
+                time.sleep(0.5)
+
+        # Start alternating the Blue LED in a separate thread to allow the main program to run
+        blue_led_thread = threading.Thread(target=alternate_blue_led)
+        blue_led_thread.daemon = True
+        blue_led_thread.start()
+
+        # Let it run for a while to observe
+        time.sleep(10)  # Run for 10 seconds before stopping the test
+
+        # Stop the Blue LED alternation
+        blue_led_running = False
+        blue_led_thread.join()  # Wait for the thread to finish
 
         print("Done.")
 
@@ -515,5 +576,5 @@ if __name__ == "__main__":
         print("Process interrupted by user.")
 
     finally:
-
         light_controller.close()
+

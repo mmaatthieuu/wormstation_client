@@ -96,5 +96,7 @@ class Logger:
         return os.path.basename(self.path)
 
 
-
+class FakeLogger:
+    def log(self, message, log_level=1):
+        print(f"[LOG - Level {log_level}]: {message}")
 
