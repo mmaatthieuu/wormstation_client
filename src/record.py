@@ -147,11 +147,13 @@ class Recorder:
     def stop(self):
 
         # Turn off all LEDs
-        self.lights.turn_off_all_leds()
+        #self.lights.turn_off_all_leds()
 
         self.logger.log("Stopping recording", log_level=3)
 
         self.update_status('Not Running')
+
+        self.lights.close()
 
         time.sleep(0.2)
         self.logger.log("Terminated", log_level=3)
@@ -165,6 +167,8 @@ class Recorder:
         # TODO : confirm parameters & check if folder already exists
         # TODO : check if samba config is working
         # TODO : clean tmp local dir
+
+        # self.lights.test()
 
         # Go to home directory
         self.go_to_tmp_recording_folder()
@@ -205,11 +209,23 @@ class Recorder:
         self.initial_time = time.time()
 
         if self.optogenetic:
-            self.lights["Orange"].run_led_timer(duration=self.parameters["pulse_duration"],
-                                         period=self.parameters["pulse_interval"],
-                                         timeout=self.parameters["timeout"],
-                                         blinking=True,
-                                         blinking_period=self.parameters["time_interval"])
+            try:
+                color = self.parameters["optogenetic_color"]
+
+                self.lights[color].run_led_timer(duration=self.parameters["pulse_duration"],
+                                             period=self.parameters["pulse_interval"],
+                                             timeout=self.parameters["timeout"],
+                                             blinking=True,
+                                             blinking_period=self.parameters["time_interval"])
+
+            except:
+                self.logger.log("Optogenetic parameters not correctly set", log_level=3)
+
+                self.lights["Orange"].run_led_timer(duration=self.parameters["pulse_duration"],
+                                                 period=self.parameters["pulse_interval"],
+                                                 timeout=self.parameters["timeout"],
+                                                 blinking=True,
+                                                 blinking_period=self.parameters["time_interval"])
 
         # self.create_output_folder()
 
@@ -306,11 +322,17 @@ class Recorder:
         # End of recording
         # Wait for the end of compression
 
+        # Terminate LED programs
+        self.logger.log("Terminating LED programs", log_level=5)
+        self.lights.close()
+
         self.uploader.wait_for_compression()
 
         self.uploader.upload_remaining_files(self.go_to_tmp_recording_folder())
 
         self.logger.log("Recording done (Timeout reached)",begin='\n\n', end='\n\n\n',log_level=3)
+        
+
 
         # After recording is finished
         self.update_status('Not Running')

@@ -1,7 +1,12 @@
 import time
 import multiprocessing
+import threading
 import atexit
+import os
 from pyftdi.spi import SpiController
+# from utils import get_most_available_core, set_affinity
+
+from src.usb_handler import USBHandler
 
 
 class LightController:
@@ -21,20 +26,48 @@ class LightController:
         self.logger = logger
         self.spi_controller = FT232H(logger=self.logger)
 
+        # Get the most available core, excluding core ?? (for example) where the main process might run
+        # available_core = get_most_available_core()
+        # set_affinity(os.getpid(), available_core)
+
+        self.spi_controller.start_vsync()
+
         # Initialize an empty dictionary if 'empty' is True
         if empty:
             self.leds = {}
         else:
             # Default LEDs
             self.leds = {
-                "IR": LED(spi_controller=self.spi_controller, channel=0, current='37.5mA', name='IR', logger=self.logger),
-                "Orange": LED(spi_controller=self.spi_controller, channel=1, current='50mA', name='Orange', logger=self.logger),
-                "Blue": LED(spi_controller=self.spi_controller, channel=2, current='37.5mA', name='Blue', logger=self.logger)
+                "IR": LED(usb_handler=self.spi_controller.usb_handler,
+                          channel=0, current='100mA', name='IR', logger=self.logger),
+                "Orange": LED(usb_handler=self.spi_controller.usb_handler,
+                              channel=1, current='50mA', name='Orange', logger=self.logger),
+                "Blue": LED(usb_handler=self.spi_controller.usb_handler,
+                            channel=2, current='37.5mA', name='Blue', logger=self.logger)
             }
+
+        # Register cleanup with atexit
+        # atexit.register(self.close)
 
     def __getitem__(self, name):
         """Allow accessing the LEDs via dictionary-like access."""
         return self.leds.get(name)
+
+    def close(self):
+        """Explicitly clean up resources."""
+        self.logger.log("Starting LightController cleanup.", log_level=5)
+
+        # Ensure all LEDs are turned off and processes are cleaned up
+        for led in self.leds.values():
+            led.cleanup()  # Explicitly clean up each LED
+
+        # Small delay for stability
+        time.sleep(0.1)
+
+        # Close the SPI controller
+        self.spi_controller.close()
+        self.logger.log("LightController resources cleaned up.", log_level=5)
+
 
     def add_LED(self, name, channel, current='7.5mA'):
         """Add a new LED to the LightController."""
@@ -42,8 +75,13 @@ class LightController:
             self.logger.log(f"LED with name '{name}' already exists.", log_level=2)
             return
 
-        self.leds[name] = LED(spi_controller=self.spi_controller, channel=channel, current=current, name=name, logger=self.logger)
+        self.leds[name] = LED(usb_handler=self.spi_controller.usb_handler, channel=channel, current=current, name=name, logger=self.logger)
         self.logger.log(f"Added new LED: {name} on channel {channel} with current {current}.", log_level=5)
+
+    def test(self):
+        """Test the LEDs by turning them on for 2 seconds each."""
+        for led in self.leds.values():
+            led.turn_on_for_n_sec(2)
 
     def turn_on_all_leds(self):
         """Turn on all the LEDs."""
@@ -65,53 +103,163 @@ class LightController:
         for led in self.leds.values():
             led.resume_process()
 
+    # Terminate all LED programs
+    def terminate_leds(self):
+        """Terminate all LED programs."""
+        for led in self.leds.values():
+            led.cleanup()
+
 
 class FT232H:
     """Class to control the FT232H chip using the PyFtdi library."""
+
+    # spi_lock = threading.Lock()
 
     def __init__(self, logger=None):
         self.logger = logger
         self.spi = SpiController()
         self.spi.configure('ftdi://ftdi:232h/1', cs_count=3, frequency=12E6)  # Reserve chip selects
 
-        self.vsync_pin = 0x40  # ADBUS6
-        self.test_led_pin = 0x80  # ADBUS7
+        self.vsync_pin = 1 << 6  # ADBUS6
+        self.test_led_pin = 1 << 7   # ADBUS7
 
         pins = [self.vsync_pin, self.test_led_pin]
 
-        self.vsync_gpio_port = self.spi.get_gpio()
-        self.vsync_gpio_port.set_direction(sum(pins), sum(pins))  # Set all pins as output
+        self.gpio = self.spi.get_gpio()
+        self.gpio.set_direction(sum(pins), sum(pins))  # Set all pins as output
 
-    def __del__(self):
+        # Create a USBHandler thread and start it
+        self.usb_handler = USBHandler(self.spi, self.gpio, logger=self.logger)
+        self.usb_handler.start()
+
+        # Initialize the Pulser for VSYNC
+        self.logger.log("Initializing VSYNC pulser...", log_level=5)
+        self.pulser = Pulser(self.usb_handler, self.vsync_pin, frequency=25)
+        self.logger.log("VSYNC pulser initialized.", log_level=5)
+        time.sleep(0.1) # Short delay for stability [Required otherwise there is a segmentation fault]
+        self.logger.log("FT232H initialized.", log_level=5)
+
+    def close(self):
+        """Explicitly clean up resources."""
+        # Stop VSYNC signal if running
+        if self.pulser.vsync_running.is_set():
+            self.pulser.stop_vsync()
+
+        # Stop the USBHandler thread
+        self.usb_handler.stop()
+
+        # Close SPI connection
         self.spi.close()
+
+        self.logger.log("FT232H resources cleaned up.", log_level=5)
+
 
     def get_port(self, cs, freq=12E6, mode=0):
         return self.spi.get_port(cs=cs, freq=freq, mode=mode)
+
+    def start_vsync(self):
+        """Start the VSYNC signal using the pulser."""
+        self.pulser.start_vsync()
+
+    def stop_vsync(self):
+        """Stop the VSYNC signal."""
+        self.pulser.stop_vsync()
+
+    # def access_spi(self, func, *args, **kwargs):
+    #     """A helper function to safely access SPI with locking."""
+    #     with FT232H.spi_lock:
+    #         return func(*args, **kwargs)
+
+
+class Pulser:
+    """Class to handle VSYNC signal using threading instead of multiprocessing."""
+
+    def __init__(self, usb_handler, vsync_pin, frequency=25):
+        """
+        Initialize the Pulser for VSYNC signal.
+        :param usb_handler: The USBHandler instance for managing GPIO operations.
+        :param vsync_pin: The GPIO pin for VSYNC.
+        :param frequency: The PWM frequency for the VSYNC signal.
+        """
+        self.usb_handler = usb_handler
+        self.vsync_pin = vsync_pin
+        self.pwm_frequency = frequency  # PWM frequency (in Hz)
+        self.pwm_period = 1.0 / self.pwm_frequency
+        self.pwm_duty_cycle = 0.05  # 5% duty cycle
+        self.vsync_running = threading.Event()
+
+        # Configure the direction only for the vsync_pin
+        self.usb_handler.gpio_set_direction(self.vsync_pin, self.vsync_pin)
+
+    def set_gpio_high(self):
+        """Set the VSYNC pin high."""
+        current_value = self.usb_handler.gpio_read()
+        new_value = current_value | self.vsync_pin
+        self.usb_handler.gpio_write(new_value)
+
+    def set_gpio_low(self):
+        """Set the VSYNC pin low."""
+        current_value = self.usb_handler.gpio_read()
+        new_value = current_value & ~self.vsync_pin
+        self.usb_handler.gpio_write(new_value)
+
+    def start_vsync(self):
+        """Start a thread to generate a 1 ms pulse every 20 ms for VSYNC."""
+        self.vsync_running.set()
+        self.vsync_thread = threading.Thread(target=self._vsync_pulse)
+        self.vsync_thread.start()
+
+    def stop_vsync(self):
+        """Stop the VSYNC pulse thread."""
+        # Wait for the LED to finish the current cycle
+        time.sleep(0.1)
+
+        self.vsync_running.clear()
+        self.vsync_thread.join()
+
+    def _vsync_pulse(self):
+        """Generate a 1 ms pulse on the VSYNC pin every 20 ms."""
+        while self.vsync_running.is_set():
+            start_time = time.time()
+
+            # Set VSYNC high for the duty cycle duration
+            self.set_gpio_high()
+            time.sleep(self.pwm_period * self.pwm_duty_cycle)
+
+            # Set VSYNC low for the remaining period
+            self.set_gpio_low()
+            elapsed_time = time.time() - start_time
+            time.sleep(max(self.pwm_period - elapsed_time, 0))
+
 
 
 class LEDDriver:
     """Class to control the LED driver (LP5860T) using SPI communication."""
 
-    def __init__(self, spi_port, current, logger=None):
+    def __init__(self, usb_handler, channel, current, logger=None):
         self.logger = logger
-        self.spi = spi_port
-
+        self.usb_handler = usb_handler
+        self.channel = channel  # SPI channel
         self.current_level = self.read_current_input(current)
         self.initialize()
 
     def initialize(self):
-        self.write_register(0x000, 0x01)
-        self.write_register(0x0A9, 0x00)  # Reset chip to default state
-
+        # Use the new function to write multiple registers
+        self.write_multiple_registers({
+            0x000: 0x01,  # Chip Enable
+            0x0A9: 0x00,  # Reset chip to default state
+        })
         time.sleep(0.001)
-
         self.set_max_current(self.current_level)
 
-        self.write_register(0x001, 0x58)  # Set data mode 1
+        # Set data mode (0x58 for mode 1, 0x5a for mode 2, 0x5c for mode 3)
+        self.write_register(0x001, 0x5a)
         time.sleep(0.001)
-        self.write_register(0x009, 0x7f)  # Set Color Current to 100%
-        self.write_register(0x00A, 0x7f)
-        self.write_register(0x00B, 0x7f)
+        self.write_multiple_registers({
+            0x009: 0x7F,  # Set Color Current to 100%
+            0x00A: 0x7F,
+            0x00B: 0x7F
+        })
 
     def set_max_current(self, current_level):
         """Set the maximum current in the Dev_config3 register."""
@@ -127,21 +275,54 @@ class LEDDriver:
         """Write data to a specific register on the SPI device."""
         address_byte1 = (register >> 2) & 0xFF
         address_byte2 = ((register & 0x03) << 6) | 0x20
-        self.spi.exchange([address_byte1, address_byte2, data])
+        self.usb_handler.spi_exchange([address_byte1, address_byte2, data], channel=self.channel)
+    def write_multiple_registers(self, registers):
+        """
+        Write multiple registers in one locked operation using auto-increment
+        where possible for consecutive addresses.
+        """
+        sorted_registers = sorted(registers.items())  # Sort by register address
+        buffer = []
+        start_address = None
+
+        for i, (register, data) in enumerate(sorted_registers):
+            if start_address is None:
+                # Set the start address for the first register
+                start_address = register
+                buffer.append((start_address >> 2) & 0xFF)  # Address byte 1
+                buffer.append(
+                    ((start_address & 0x03) << 6) | 0x20)  # Address byte 2 (Write, auto-increment enabled)
+
+            # Add the data byte
+            buffer.append(data)
+
+            # Check if the next register is consecutive
+            if i + 1 < len(sorted_registers):
+                next_register = sorted_registers[i + 1][0]
+                if next_register != register + 1:
+                    # If the next register is not consecutive, send the current buffer
+                    self.usb_handler.spi_exchange(buffer, channel=self.channel)
+                    buffer = []  # Reset buffer for the next transaction
+                    start_address = None  # Reset start address
+            else:
+                # If it's the last register, send the buffer
+                self.usb_handler.spi_exchange(buffer, channel=self.channel)
 
     def read_register(self, register, print_result=False):
         """Read data from a specific register on the SPI device."""
         address_byte1 = (register >> 2) & 0xFF
         address_byte2 = ((register & 0x03) << 6)
-        result = self.spi.exchange([address_byte1, address_byte2, 0x00], duplex=True)
+
+        result = self.usb_handler.spi_exchange([address_byte1, address_byte2, 0x00], channel=self.channel,
+                                               duplex=True)
         if print_result:
             print(f"Read result from register {hex(register)}: {hex(result[2])}")
         return result[2]
 
     def set_pwm_brightness(self, brightness):
         """Set the PWM brightness for all dots."""
-        for register in range(0x200, 0x2C5):
-            self.write_register(register, brightness)
+        registers = {reg: brightness for reg in range(0x200, 0x2C5)}
+        self.write_multiple_registers(registers)
 
     def read_current_input(self, current):
         current_levels = {'7.5mA': 0, '12.5mA': 1, '25mA': 2, '37.5mA': 3, '50mA': 4, '75mA': 5, '100mA': 6}
@@ -167,8 +348,9 @@ class LEDDriver:
                                         default=min(current_levels_float.keys()))
 
                     # Log the warning
-                    self.logger.log(f'Invalid current level. Setting to the closest inferior value: {closest_value} mA',
-                                    log_level=3)
+                    self.logger.log(
+                        f'Invalid current level. Setting to the closest inferior value: {closest_value} mA',
+                        log_level=3)
                     # Return the corresponding level
                     return current_levels_float[closest_value]
 
@@ -187,18 +369,15 @@ class LEDDriver:
 class LED:
     """Class to control an LED using the FT232H chip."""
 
-    def __init__(self, spi_controller, channel, current='7.5mA', logger=None, name=None):
-        self.spi_port = spi_controller.get_port(cs=channel)
-        self.led_driver = LEDDriver(self.spi_port, current=current, logger=logger)
+    def __init__(self, usb_handler, channel, current='7.5mA', logger=None, name=None):
+        self.channel = channel  # SPI channel for this LED
+        self.led_driver = LEDDriver(usb_handler=usb_handler, channel=self.channel, current=current, logger=logger)
 
         self.logger = logger
         self.name = name
-
         self.is_on = None
         self.program = None
-        self.running = multiprocessing.Event()
-
-        atexit.register(self.cleanup)
+        self.running = threading.Event()
 
     def turn_on(self):
         self.logger.log(f'Turning on {self.name} LED', log_level=5)
@@ -211,10 +390,15 @@ class LED:
         self.is_on = False
 
     def cleanup(self):
-        self.turn_off()
+        """Cleanup the LED processes and turn it off."""
+
         if self.program and self.program.is_alive():
-            self.program.terminate()
-            self.program.join()
+            self.logger.log(f"Terminating LED program for {self.name}", log_level=5)
+            self.running.clear()
+            self.program.join()  # Ensure the thread has terminated
+            self.logger.log(f"LED program for {self.name} terminated", log_level=5)
+
+        self.turn_off()
 
     def pause_process(self):
         """Pause the blinking process."""
@@ -234,14 +418,24 @@ class LED:
         self.turn_off()
 
     def blink(self, total_duration, blink_on_duration, blink_period):
+        """Blink the LED for a total duration."""
         end_time = time.time() + total_duration
         off_time = blink_period - blink_on_duration
 
-        while time.time() < end_time:
+        while time.time() < end_time and self.running.is_set():
             self.turn_on()
             time.sleep(blink_on_duration)
+
+            # Check if thread should terminate before turning off
+            if not self.running.is_set():
+                break
+
             self.turn_off()
             time.sleep(off_time)
+
+            # Check again before the next cycle
+            if not self.running.is_set():
+                break
 
     def wait_until_next_activation(self, period, offset):
         """Wait until the next activation of the LED based on the period and offset."""
@@ -253,33 +447,73 @@ class LED:
     def run_led_timer(self, duration, period, timeout, blinking=False, blinking_period=None):
         """
         Run a timer to control the LED.
-
         Parameters:
         - duration: The duration for which the LED should be on, in seconds.
         - period: The time interval between each activation of the LED.
         - timeout: The total time for which the LED should run, in seconds.
         - blinking: A flag to indicate whether the LED should blink or stay on.
         """
+        timeout += period * 2  # Ensure some extra time buffer
 
-        timeout += period * 2
-
-        def led_timer_process():
+        def led_timer_thread():
             end_time = time.time() + timeout
 
-            while time.time() < end_time:
-                self.running.wait()
-
+            while time.time() < end_time and self.running.is_set():
                 if blinking:
                     self.wait_until_next_activation(period, 0.5)
+                    if not self.running.is_set():
+                        break  # Exit early if requested
                     self.blink(duration, 1, blinking_period)
                 else:
                     self.wait_until_next_activation(period, -0.25)
+                    if not self.running.is_set():
+                        break  # Exit early if requested
                     self.turn_on_for_n_sec(duration)
 
         if self.program and self.program.is_alive():
             self.cleanup()
 
-        self.running.set()
-        self.program = multiprocessing.Process(target=led_timer_process)
+        self.running.set()  # Signal to start the timer
+        self.program = threading.Thread(target=led_timer_thread)
         self.program.start()
-        self.logger.log(f'Started LED timer process for {self.name}', log_level=5)
+        self.logger.log(f'Started LED timer thread for {self.name}', log_level=5)
+
+
+class FakeLogger:
+    def log(self, message, log_level=5):
+        print(f"[LOG - Level {log_level}]: {message}")
+
+
+if __name__ == "__main__":
+    # Initialize the logger (You can create a Logger object or set it to None if you do not want logging)
+    logger = FakeLogger()  # Replace with an actual Logger object if needed
+
+    # Create an instance of LightController
+    light_controller = LightController(logger=logger)
+
+    light_controller.turn_off_all_leds()
+
+    # Turn on each LED for 2 seconds using the turn_on_for_n_sec method
+    try:
+        # Turn on the IR LED for 2 seconds
+        light_controller["IR"].turn_on_for_n_sec(2)
+
+        # Turn on the Orange LED for 2 seconds
+        light_controller["Orange"].turn_on_for_n_sec(2)
+
+        # Turn on the Blue LED for 2 seconds
+        light_controller["Blue"].turn_on_for_n_sec(2)
+
+        light_controller["Blue"].run_led_timer(duration=1, period=5, timeout=20, blinking=True, blinking_period=20)
+
+        # wait for program to finish
+        light_controller["Blue"].program.join()
+
+        print("Done.")
+
+    except KeyboardInterrupt:
+        print("Process interrupted by user.")
+
+    finally:
+
+        light_controller.close()
