@@ -4,6 +4,8 @@ import threading
 import atexit
 import os
 from pyftdi.spi import SpiController
+from pyftdi.ftdi import FtdiError
+from pyftdi.usbtools import UsbToolsError
 # from utils import get_most_available_core, set_affinity
 
 from src.usb_handler import USBHandler
@@ -12,44 +14,38 @@ from src.usb_handler import USBHandler
 class LightController:
     """Class to control the LEDs using the FT232H chip."""
 
+
     def __init__(self, logger=None, empty=False):
         """Constructor for the LightController class."""
-        """
-        Possible channels: 0, 1, 2, 3
-        Channel 0: IR LED
-        Channel 1: Orange LED
-        Channel 2: Blue LED
-
-        Possible current values [mA]: 7.5, 12.5, 25, 37.5, 50, 75, 100
-        """
-
         self.logger = logger
-        self.spi_controller = FT232H(logger=self.logger)
+        self.spi_controller = None  # Initialize as None in case there's no device
+        self.device_connected = False  # Track if the device is connected
 
-        # Get the most available core, excluding core ?? (for example) where the main process might run
-        # available_core = get_most_available_core()
-        # set_affinity(os.getpid(), available_core)
-
-        self.spi_controller.start_vsync()
+        try:
+            # Attempt to initialize FT232H and SPI controller
+            self.spi_controller = FT232H(logger=self.logger)
+            self.spi_controller.start_vsync()
+            self.device_connected = True  # Set the flag to True if initialization succeeds
+        except FtdiError as e:
+            # Handle case when the FT232H is not connected
+            self.logger.log(f"FT232H device not found or could not be configured: {e}", log_level=3)
+        except UsbToolsError as e:
+            # Handle case when there's an issue with the USB connection
+            self.logger.log(f"USB error occurred: {e}", log_level=3)
 
         # Initialize an empty dictionary if 'empty' is True
         if empty:
             self.leds = {}
         else:
-            # Default LEDs
+            # Create dummy LED handlers if device is not connected
             self.leds = {
-                "IR": LED(usb_handler=self.spi_controller.usb_handler,
+                "IR": LED(usb_handler=self.spi_controller.usb_handler if self.device_connected else None,
                           channel=0, current='100mA', name='IR', logger=self.logger),
-                # Orange LEDs recommended current is 50mA for long term use
-                "Orange": LED(usb_handler=self.spi_controller.usb_handler,
+                "Orange": LED(usb_handler=self.spi_controller.usb_handler if self.device_connected else None,
                               channel=1, current='100mA', name='Orange', logger=self.logger),
-                # Blue LEDs recommended current is 37.5mA for long term use
-                "Blue": LED(usb_handler=self.spi_controller.usb_handler,
+                "Blue": LED(usb_handler=self.spi_controller.usb_handler if self.device_connected else None,
                             channel=2, current='100mA', name='Blue', logger=self.logger)
             }
-
-        # Register cleanup with atexit
-        # atexit.register(self.close)
 
     def __getitem__(self, name):
         """Allow accessing the LEDs via dictionary-like access."""
@@ -57,63 +53,72 @@ class LightController:
 
     def close(self):
         """Explicitly clean up resources."""
+        if not self.device_connected:
+            self.logger.log("No USB device to clean up.", log_level=3)
+            return
         self.logger.log("Starting LightController cleanup.", log_level=5)
-
-        # Ensure all LEDs are turned off and processes are cleaned up
         for led in self.leds.values():
-            led.cleanup()  # Explicitly clean up each LED
-
-        # Small delay for stability
+            led.cleanup()
         time.sleep(0.1)
-
-        # Close the SPI controller
         self.spi_controller.close()
         self.logger.log("LightController resources cleaned up.", log_level=5)
-
 
     def add_LED(self, name, channel, current='7.5mA'):
         """Add a new LED to the LightController."""
         if name in self.leds:
             self.logger.log(f"LED with name '{name}' already exists.", log_level=2)
             return
+        if not self.device_connected:
+            self.logger.log("No USB device connected. Cannot add new LED.", log_level=3)
+            return
 
-        self.leds[name] = LED(usb_handler=self.spi_controller.usb_handler, channel=channel, current=current, name=name, logger=self.logger)
+        self.leds[name] = LED(usb_handler=self.spi_controller.usb_handler, channel=channel, current=current, name=name,
+                              logger=self.logger)
         self.logger.log(f"Added new LED: {name} on channel {channel} with current {current}.", log_level=5)
 
     def test(self):
         """Test the LEDs by turning them on for 2 seconds each."""
-        for led in self.leds.values():
-            led.turn_on_for_n_sec(2)
+        if self.device_connected:
+            for led in self.leds.values():
+                led.turn_on_for_n_sec(2)
 
     def turn_on_all_leds(self):
         """Turn on all the LEDs."""
-        for led in self.leds.values():
-            led.turn_on()
+        if self.device_connected:
+            for led in self.leds.values():
+                led.turn_on()
 
     def turn_off_all_leds(self):
         """Turn off all the LEDs."""
-        for led in self.leds.values():
-            led.turn_off()
+        if self.device_connected:
+            for led in self.leds.values():
+                led.turn_off()
 
     def pause_all_leds(self):
         """Pause all the blinking processes."""
-        for led in self.leds.values():
-            led.pause_process()
+        if self.device_connected:
+            for led in self.leds.values():
+                led.pause_process()
 
     def resume_all_leds(self):
         """Resume all the blinking processes."""
-        for led in self.leds.values():
-            led.resume_process()
+        if self.device_connected:
+            for led in self.leds.values():
+                led.resume_process()
 
     # Terminate all LED programs
     def terminate_leds(self):
         """Terminate all LED programs."""
-        for led in self.leds.values():
-            led.cleanup()
+        if self.device_connected:
+            for led in self.leds.values():
+                led.cleanup()
 
     def switch_led(self, name: str, state: bool):
         """Switch an LED on or off based on its name and state."""
         if name in self.leds:
+            if not self.device_connected:
+                self.logger.log(f"No USB device found. Cannot switch {name} LED.", log_level=2)
+                return
             led = self.leds[name]
             if state:
                 self.logger.log(f"Switching ON {name} LED", log_level=5)
@@ -125,6 +130,7 @@ class LightController:
             self.logger.log(f"LED '{name}' does not exist.", log_level=2)
 
 
+
 class FT232H:
     """Class to control the FT232H chip using the PyFtdi library."""
 
@@ -133,7 +139,17 @@ class FT232H:
     def __init__(self, logger=None):
         self.logger = logger
         self.spi = SpiController()
-        self.spi.configure('ftdi://ftdi:232h/1', cs_count=3, frequency=12E6)  # Reserve chip selects
+        self.usb_handler = None
+
+        try:
+            # Attempt to configure the SPI controller
+            self.spi.configure('ftdi://ftdi:232h/1', cs_count=3, frequency=12E6)
+        except FtdiError as e:
+            self.logger.log(f"FT232H initialization failed: {e}", log_level=3)
+            raise e
+        except UsbToolsError as e:
+            self.logger.log(f"USB error occurred: {e}", log_level=3)
+            raise e
 
         self.vsync_pin = 1 << 6  # ADBUS6
         self.test_led_pin = 1 << 7   # ADBUS7
@@ -254,9 +270,11 @@ class LEDDriver:
     def __init__(self, usb_handler, channel, current, logger=None):
         self.logger = logger
         self.usb_handler = usb_handler
-        self.channel = channel  # SPI channel
-        self.current_level = self.read_current_input(current)
-        self.initialize()
+
+        if self.usb_handler is not None:
+            self.channel = channel  # SPI channel
+            self.current_level = self.read_current_input(current)
+            self.initialize()
 
     def initialize(self):
         # Use the new function to write multiple registers
@@ -278,61 +296,65 @@ class LEDDriver:
 
     def set_max_current(self, current_level):
         """Set the maximum current in the Dev_config3 register."""
-        if current_level < 0 or current_level > 6:
-            print("Invalid current level. Please provide a value between 0 and 6.")
-            return
-        default_value = 0x47
-        new_value = (default_value & 0b11110001) | ((current_level << 1) & 0b00001110)
-        self.write_register(0x004, new_value)
-        print(f"Set maximum current to level {current_level}")
+        if self.usb_handler is not None:
+            if current_level < 0 or current_level > 6:
+                print("Invalid current level. Please provide a value between 0 and 6.")
+                return
+            default_value = 0x47
+            new_value = (default_value & 0b11110001) | ((current_level << 1) & 0b00001110)
+            self.write_register(0x004, new_value)
+            print(f"Set maximum current to level {current_level}")
 
     def write_register(self, register, data):
         """Write data to a specific register on the SPI device."""
-        address_byte1 = (register >> 2) & 0xFF
-        address_byte2 = ((register & 0x03) << 6) | 0x20
-        self.usb_handler.spi_exchange([address_byte1, address_byte2, data], channel=self.channel)
+        if self.usb_handler is not None:
+            address_byte1 = (register >> 2) & 0xFF
+            address_byte2 = ((register & 0x03) << 6) | 0x20
+            self.usb_handler.spi_exchange([address_byte1, address_byte2, data], channel=self.channel)
     def write_multiple_registers(self, registers):
         """
         Write multiple registers in one locked operation using auto-increment
         where possible for consecutive addresses.
         """
-        sorted_registers = sorted(registers.items())  # Sort by register address
-        buffer = []
-        start_address = None
+        if self.usb_handler is not None:
+            sorted_registers = sorted(registers.items())  # Sort by register address
+            buffer = []
+            start_address = None
 
-        for i, (register, data) in enumerate(sorted_registers):
-            if start_address is None:
-                # Set the start address for the first register
-                start_address = register
-                buffer.append((start_address >> 2) & 0xFF)  # Address byte 1
-                buffer.append(
-                    ((start_address & 0x03) << 6) | 0x20)  # Address byte 2 (Write, auto-increment enabled)
+            for i, (register, data) in enumerate(sorted_registers):
+                if start_address is None:
+                    # Set the start address for the first register
+                    start_address = register
+                    buffer.append((start_address >> 2) & 0xFF)  # Address byte 1
+                    buffer.append(
+                        ((start_address & 0x03) << 6) | 0x20)  # Address byte 2 (Write, auto-increment enabled)
 
-            # Add the data byte
-            buffer.append(data)
+                # Add the data byte
+                buffer.append(data)
 
-            # Check if the next register is consecutive
-            if i + 1 < len(sorted_registers):
-                next_register = sorted_registers[i + 1][0]
-                if next_register != register + 1:
-                    # If the next register is not consecutive, send the current buffer
+                # Check if the next register is consecutive
+                if i + 1 < len(sorted_registers):
+                    next_register = sorted_registers[i + 1][0]
+                    if next_register != register + 1:
+                        # If the next register is not consecutive, send the current buffer
+                        self.usb_handler.spi_exchange(buffer, channel=self.channel)
+                        buffer = []  # Reset buffer for the next transaction
+                        start_address = None  # Reset start address
+                else:
+                    # If it's the last register, send the buffer
                     self.usb_handler.spi_exchange(buffer, channel=self.channel)
-                    buffer = []  # Reset buffer for the next transaction
-                    start_address = None  # Reset start address
-            else:
-                # If it's the last register, send the buffer
-                self.usb_handler.spi_exchange(buffer, channel=self.channel)
 
     def read_register(self, register, print_result=False):
         """Read data from a specific register on the SPI device."""
-        address_byte1 = (register >> 2) & 0xFF
-        address_byte2 = ((register & 0x03) << 6)
+        if self.usb_handler is not None:
+            address_byte1 = (register >> 2) & 0xFF
+            address_byte2 = ((register & 0x03) << 6)
 
-        result = self.usb_handler.spi_exchange([address_byte1, address_byte2, 0x00], channel=self.channel,
-                                               duplex=True)
-        if print_result:
-            print(f"Read result from register {hex(register)}: {hex(result[2])}")
-        return result[2]
+            result = self.usb_handler.spi_exchange([address_byte1, address_byte2, 0x00], channel=self.channel,
+                                                   duplex=True)
+            if print_result:
+                print(f"Read result from register {hex(register)}: {hex(result[2])}")
+            return result[2]
 
     def set_pwm_brightness(self, brightness):
         """Set the PWM brightness for all dots."""
