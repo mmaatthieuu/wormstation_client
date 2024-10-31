@@ -134,7 +134,6 @@ else
     echo "User is already part of all required groups."
 fi
 
-
 # Disable services with security vulnerabilities
 echo "Disabling services with security vulnerabilities..."
 sudo systemctl stop cups-browsed.service
