@@ -60,7 +60,8 @@ class LightController:
         for led in self.leds.values():
             led.cleanup()
         time.sleep(0.1)
-        self.spi_controller.close()
+        if self.spi_controller:
+            self.spi_controller.close()
         self.logger.log("LightController resources cleaned up.", log_level=5)
 
     def add_LED(self, name, channel, current='7.5mA'):
@@ -171,16 +172,20 @@ class FT232H:
         self.logger.log("FT232H initialized.", log_level=5)
 
     def close(self):
-        """Explicitly clean up resources."""
+        """Explicitly clean up resources with additional checks."""
+        self.logger.log("Starting FT232H cleanup.", log_level=5)
+
         # Stop VSYNC signal if running
-        if self.pulser.vsync_running.is_set():
+        if hasattr(self, 'pulser') and self.pulser.vsync_running.is_set():
             self.pulser.stop_vsync()
 
-        # Stop the USBHandler thread
-        self.usb_handler.stop()
+        # Stop the USBHandler thread if it exists
+        if hasattr(self, 'usb_handler'):
+            self.usb_handler.stop()
 
-        # Close SPI connection
-        self.spi.close()
+        # Close the SPI connection if initialized
+        if hasattr(self, 'spi'):
+            self.spi.close()
 
         self.logger.log("FT232H resources cleaned up.", log_level=5)
 
