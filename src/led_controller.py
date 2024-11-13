@@ -1,8 +1,5 @@
 import time
-import multiprocessing
 import threading
-import atexit
-import os
 from pyftdi.spi import SpiController
 from pyftdi.ftdi import FtdiError
 from pyftdi.usbtools import UsbToolsError
@@ -16,42 +13,43 @@ class LightController:
 
 
     def __init__(self, logger=None, empty=False):
-        """Constructor for the LightController class."""
         self.logger = logger
-        self.spi_controller = None  # Initialize as None in case there's no device
-        self.device_connected = False  # Track if the device is connected
+        self.device_connected = False
+        self.leds = {}
+        self.initialized = threading.Event()  # Use an event to signal initialization completion
 
+        # Start asynchronous initialization in a separate thread
+        init_thread = threading.Thread(target=self.initialize, args=(empty,))
+        init_thread.start()
+
+    def initialize(self, empty):
         try:
-            # Attempt to initialize FT232H and SPI controller
             self.spi_controller = FT232H(logger=self.logger)
             self.spi_controller.start_vsync()
-            self.device_connected = True  # Set the flag to True if initialization succeeds
-        except FtdiError as e:
-            # Handle case when the FT232H is not connected
-            self.logger.log(f"FT232H device not found or could not be configured: {e}", log_level=3)
-        except UsbToolsError as e:
-            # Handle case when there's an issue with the USB connection
-            self.logger.log(f"USB error occurred: {e}", log_level=3)
+            self.device_connected = True
 
-        # Initialize an empty dictionary if 'empty' is True
-        if empty:
-            self.leds = {}
-        else:
-            # Create dummy LED handlers if device is not connected
-            self.leds = {
-                "IR": LED(usb_handler=self.spi_controller.usb_handler if self.device_connected else None,
-                          channel=0, current='100mA', name='IR', logger=self.logger),
-                "Orange": LED(usb_handler=self.spi_controller.usb_handler if self.device_connected else None,
-                              channel=1, current='100mA', name='Orange', logger=self.logger),
-                "Blue": LED(usb_handler=self.spi_controller.usb_handler if self.device_connected else None,
-                            channel=2, current='100mA', name='Blue', logger=self.logger)
-            }
+            if not empty:
+                # Initialize LEDs
+                self.leds = {
+                    "IR": LED(usb_handler=self.spi_controller.usb_handler, channel=0, current='100mA', name='IR', logger=self.logger),
+                    "Orange": LED(usb_handler=self.spi_controller.usb_handler, channel=1, current='100mA', name='Orange', logger=self.logger),
+                    "Blue": LED(usb_handler=self.spi_controller.usb_handler, channel=2, current='100mA', name='Blue', logger=self.logger)
+                }
+        except (FtdiError, UsbToolsError) as e:
+            if self.logger:
+                self.logger.log(f"Initialization error: {e}", log_level=3)
+        finally:
+            self.initialized.set()  # Signal that initialization is complete
+
+    def wait_until_ready(self):
+        """Block until initialization is complete."""
+        self.initialized.wait()
 
     def __getitem__(self, name):
         """Allow accessing the LEDs via dictionary-like access."""
         return self.leds.get(name)
 
-    def close(self):
+    def close_func(self):
         """Explicitly clean up resources."""
         if not self.device_connected:
             self.logger.log("No USB device to clean up.", log_level=3)
@@ -63,6 +61,10 @@ class LightController:
         if self.spi_controller:
             self.spi_controller.close()
         self.logger.log("LightController resources cleaned up.", log_level=5)
+
+    def close(self):
+        close_thread = threading.Thread(target=self.close_func)
+        close_thread.start()
 
     def add_LED(self, name, channel, current='7.5mA'):
         """Add a new LED to the LightController."""

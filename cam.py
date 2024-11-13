@@ -9,6 +9,7 @@ import sys
 import signal
 import cProfile
 import pstats
+import time
 
 from parameters import Parameters
 
@@ -115,10 +116,20 @@ def main():
     signal.signal(signal.SIGTERM, sigterm_handler)
     signal.signal(signal.SIGUSR1, sigusr1_handler)  # Custom signal handler for capturing a new frame
 
+    # start a timer to measure the time it takes to start the program
+    global start_time
+    start_time = time.time()
+
     parameters = Parameters(sys.argv[1])
+
+    #print time after reading parameters
+    print("[Device] Time after reading parameters: ", time.time() - start_time)
 
     global recorder
     recorder = Recorder(parameters=parameters, git_version=get_git_version())
+
+    #print time after creating recorder
+    print("[Device] Time after creating recorder: ", time.time() - start_time)
 
     #picamera.PiCamera.CAPTURE_TIMEOUT = 3
 
@@ -157,4 +168,5 @@ def main():
             #log("Over.")
 
 if __name__ == "__main__":
+    print("Starting main")
     main()

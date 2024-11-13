@@ -1,20 +1,17 @@
-import cv2
 import sys
 import os
 
-import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
-from tqdm import tqdm
 import csv
 
-import trackpy as tp
-import pandas as pd
 
-import numpy as np
+from tqdm import tqdm
+
+
 
 
 class Analyser:
     def __init__(self, visualization=False, output_folder=None, logger=None, standalone=False):
+
         self.video_path = None
         self.visualization = visualization
         self.output_folder = output_folder
@@ -29,6 +26,8 @@ class Analyser:
 
     def run(self, video_path):
         print(f"Running analysis for {video_path}")
+
+        import trackpy as tp
 
         if not self.standalone:
             self.logger.log(f"Running analysis for {video_path}", log_level=3)
@@ -120,6 +119,9 @@ class Analyser:
 
 
     def get_specific_frame(self, video_path, frame_number):
+
+        import cv2
+
         # Open the video file
         cap = cv2.VideoCapture(video_path)
 
@@ -147,6 +149,8 @@ class Analyser:
 
     def load_video(self, video_path):
 
+        import cv2
+
         if not self.standalone:
             self.logger.log(f"Loading video from {video_path}", log_level=5)
         # Open the video file
@@ -167,6 +171,9 @@ class Analyser:
         return cap, width, height
 
     def detect_petri_edges(self, frame):
+
+        import cv2
+
         # Convert the frame to grayscale
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
@@ -184,6 +191,9 @@ class Analyser:
         return edges, binary_frame
 
     def detect_circles(self, binary_frame, max_distance_from_center=200):
+
+        import cv2
+
         # Hough Circle Transform parameters
         dp = 1  # Inverse ratio of the accumulator resolution to the image resolution
         min_dist = 500  # Minimum distance between the centers of detected circles
@@ -215,6 +225,9 @@ class Analyser:
         return None
 
     def draw_circles(self, frame, circle_info):
+
+        import cv2
+
         # not used
         print("draw_circles")
         if circle_info is not None:
@@ -240,6 +253,8 @@ class Analyser:
             print("No circle detected.")
 
     def locate_worms(self, video_path, detected_circles=None, min_element_area_threshold=30, stop_at_frame=50):
+
+        import cv2
 
         if not self.standalone:
             self.logger.log(f"Locating worms in {video_path}", log_level=5)
@@ -384,6 +399,11 @@ class Analyser:
 
     def compute_average_velocity_with_trackpy(self, all_centers_by_frame, frame_rate=2, search_range=15):
 
+        # Lazy import of trackpy and pandas to avoid slowing down the script
+        import trackpy as tp
+        import pandas as pd
+        import numpy as np
+
         if not self.standalone:
             self.logger.log(f"Computing average velocity with trackpy", log_level=5)
 
@@ -423,6 +443,9 @@ class Analyser:
         return result_df, linked_df
 
     def compute_speed_for_trajectories(self, all_centers_by_frame):
+
+        import numpy as np
+
         speeds_by_frame = {}
         for frame in all_centers_by_frame:
             centers = np.array(all_centers_by_frame[frame])
@@ -438,6 +461,14 @@ class Analyser:
 
 
     def play_movie_with_linked_trajectories(self, video_path, all_centers_by_frame, trajectories):
+
+        # Lazy import of matplotlib to avoid slowing down the script
+        import matplotlib.pyplot as plt
+        from matplotlib.animation import FuncAnimation
+
+        import cv2
+        import numpy as np
+
         # Open the video file
         cap = cv2.VideoCapture(video_path)
 
@@ -498,6 +529,9 @@ class Analyser:
 
 
     def display_images_with_assignments(self, frames, centers_by_frame, row_ind, col_ind):
+
+        import cv2
+
         for i in range(len(frames) - 1):
             img1 = self.get_specific_frame(self.video_path, frames[i])
             img2 = self.get_specific_frame(self.video_path, frames[i + 1])
@@ -517,6 +551,11 @@ class Analyser:
             self.display_two_images(img1, img2, f"Assignment between frames {frames[i]} and {frames[i + 1]}")
 
     def display_two_images(self, img1, img2, title):
+
+        import cv2
+
+        import matplotlib.pyplot as plt
+
         plt.figure(figsize=(12, 6))
         plt.subplot(1, 2, 1)
         plt.imshow(cv2.cvtColor(img1, cv2.COLOR_BGR2RGB))
@@ -616,6 +655,8 @@ class Analyser:
     def plot_chemotaxis_data(self, chemotaxis_data, frame_rate=2, output_prefix="chemotaxis_plot",
                              font_size=14):
 
+        import matplotlib.pyplot as plt
+
         if not self.standalone:
             self.logger.log(f"Plotting chemotaxis data", log_level=5)
 
@@ -657,6 +698,8 @@ class Analyser:
         return [pdf_filename, png_filename]
 
     def plot_mean_speed(self, result_df, output_prefix="mean_speed_plot", font_size=14):
+
+        import matplotlib.pyplot as plt
 
         if not self.standalone:
             self.logger.log(f"Plotting mean speed", log_level=5)

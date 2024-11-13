@@ -1,4 +1,3 @@
-import numpy as np
 import time
 import datetime
 from socket import gethostname
@@ -11,10 +10,11 @@ import json
 from picamera2 import MappedArray
 import cv2
 
+
 from math import log10, ceil
 
 # from threading import Thread, Lock
-import multiprocessing
+#import multiprocessing
 
 import psutil
 import pathlib
@@ -27,10 +27,10 @@ import subprocess
 from subprocess import TimeoutExpired
 from pathlib import Path
 
-import src.NPImage as npi
+#import src.NPImage as npi
 from src.log import Logger
 from src.upload_manager import SMBManager, SSHManager, EmptyUploader
-from src.analyse import Analyser
+#from src.analyse import Analyser
 
 '''
 Verbosity levels:
@@ -170,6 +170,9 @@ class Recorder:
 
         # self.lights.test()
 
+        # initialize a timer
+        #self.initial_time = time.time()
+
         # Go to home directory
         self.go_to_tmp_recording_folder()
 
@@ -177,11 +180,19 @@ class Recorder:
 
         # Compute the total number of frame from the recording time and time interval between frames
 
+        self.camera.wait_for_init()
+
         self.camera.pre_callback = self.annotate_frame
+
+        #print time before starting the camera since initial time
+        #print(f'time before starting the camera since initial time: {time.time() - self.initial_time}')
 
         self.camera.start()
 
+        #print(f'time after starting the camera since initial time: {time.time() - self.initial_time}')
 
+        # Wait for the LEDs to be ready
+        self.lights.wait_until_ready()
 
         if not self.preview_only():
             # If one does an actual recording and not just a preview (i.e. timeout=0)
@@ -190,6 +201,7 @@ class Recorder:
             #print("#DEBUG Starting LED timer with duration %f, period %f, timeout %f" % (self.parameters["illumination_pulse"]/1000,
             #                                                                      self.parameters["time_interval"],
             #                                                                      self.parameters["timeout"]))
+
 
             self.lights["IR"].run_led_timer(duration=self.parameters["illumination_pulse"] / 1000,
                                        period=self.parameters["time_interval"],
@@ -411,25 +423,29 @@ class Recorder:
 
     def annotate_frame(self, request):
         if self.parameters["annotate_frames"]:
-
             name = self.parameters["recording_name"]
 
+            # Text overlay settings
             colour = (0, 255, 0)
             origin = (0, 40)
             font = cv2.FONT_HERSHEY_SIMPLEX
             scale = 1
             thickness = 2
 
-            string_time = (datetime.now()).strftime('%Y-%m-%d %H:%M:%S.%f')
-            string_to_overlay = "%s | %s | %s | %s" % (gethostname(), self.get_filename(), string_time, name)
+            # Generate overlay text
+            string_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
+            string_to_overlay = f"{gethostname()} | {self.get_filename()} | {string_time} | {name}"
 
             try:
+                # Access the array data with MappedArray
                 with MappedArray(request, "main") as m:
+                    # Directly add text using OpenCV
                     cv2.putText(m.array, string_to_overlay, origin, font, scale, colour, thickness)
+
             except AttributeError:
-                # In case the function is called for a black frame, so the request is actually a np.array and
-                # not a picam2 request
-                return cv2.putText(request, string_to_overlay, origin, font, scale, colour, thickness)
+                # Fallback if request is already a numpy array (e.g., black frame)
+                cv2.putText(request, string_to_overlay, origin, font, scale, colour, thickness)
+                return request
 
     def save_frame(self):
         """
@@ -447,6 +463,8 @@ class Recorder:
         # Create array with the right size, i.e. sensor resolution. The [::-1] reverse the tuple order, otherwise
         # the picture is in portrait mode rather than landscape.
         # The +(3,) is used to append 3 (i.e. the number of RGB channels) to create a RGB image
+
+        import numpy as np
 
         zero_array = np.zeros((self.camera.camera_properties["PixelArraySize"])[::-1] + (3,), dtype=np.uint8)
         zero_array = self.annotate_frame(zero_array)
