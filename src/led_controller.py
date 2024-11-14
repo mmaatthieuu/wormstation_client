@@ -12,17 +12,17 @@ class LightController:
     """Class to control the LEDs using the FT232H chip."""
 
 
-    def __init__(self, logger=None, empty=False):
+    def __init__(self, logger=None, empty=False, keep_final_state=False):
         self.logger = logger
         self.device_connected = False
         self.leds = {}
         self.initialized = threading.Event()  # Use an event to signal initialization completion
 
         # Start asynchronous initialization in a separate thread
-        init_thread = threading.Thread(target=self.initialize, args=(empty,))
+        init_thread = threading.Thread(target=self.initialize, args=(empty,keep_final_state,))
         init_thread.start()
 
-    def initialize(self, empty):
+    def initialize(self, empty, keep_final_state=False):
         try:
             self.spi_controller = FT232H(logger=self.logger)
             self.spi_controller.start_vsync()
@@ -31,9 +31,23 @@ class LightController:
             if not empty:
                 # Initialize LEDs
                 self.leds = {
-                    "IR": LED(usb_handler=self.spi_controller.usb_handler, channel=0, current='100mA', name='IR', logger=self.logger),
-                    "Orange": LED(usb_handler=self.spi_controller.usb_handler, channel=1, current='100mA', name='Orange', logger=self.logger),
-                    "Blue": LED(usb_handler=self.spi_controller.usb_handler, channel=2, current='100mA', name='Blue', logger=self.logger)
+                    "IR": LED(usb_handler=self.spi_controller.usb_handler,
+                              channel=0,
+                              current='100mA',
+                              name='IR',
+                              logger=self.logger,
+                              final_state=keep_final_state),
+                    "Orange": LED(usb_handler=self.spi_controller.usb_handler,
+                                  channel=1, current='100mA',
+                                  name='Orange',
+                                  logger=self.logger,
+                                  final_state=keep_final_state),
+                    "Blue": LED(usb_handler=self.spi_controller.usb_handler,
+                                channel=2,
+                                current='100mA',
+                                name='Blue',
+                                logger=self.logger,
+                                final_state=keep_final_state)
                 }
         except (FtdiError, UsbToolsError) as e:
             if self.logger:
@@ -66,7 +80,7 @@ class LightController:
         close_thread = threading.Thread(target=self.close_func)
         close_thread.start()
 
-    def add_LED(self, name, channel, current='7.5mA'):
+    def add_LED(self, name, channel, current='7.5mA', final_state=False):
         """Add a new LED to the LightController."""
         if name in self.leds:
             self.logger.log(f"LED with name '{name}' already exists.", log_level=2)
@@ -76,7 +90,7 @@ class LightController:
             return
 
         self.leds[name] = LED(usb_handler=self.spi_controller.usb_handler, channel=channel, current=current, name=name,
-                              logger=self.logger)
+                              logger=self.logger, final_state=final_state)
         self.logger.log(f"Added new LED: {name} on channel {channel} with current {current}.", log_level=5)
 
     def test(self):
@@ -413,7 +427,7 @@ class LEDDriver:
 class LED:
     """Class to control an LED using the FT232H chip."""
 
-    def __init__(self, usb_handler, channel, current='7.5mA', logger=None, name=None):
+    def __init__(self, usb_handler, channel, current='7.5mA', logger=None, name=None, final_state=False):
         self.channel = channel  # SPI channel for this LED
         self.led_driver = LEDDriver(usb_handler=usb_handler, channel=self.channel, current=current, logger=logger)
 
@@ -422,6 +436,7 @@ class LED:
         self.is_on = None
         self.program = None
         self.running = threading.Event()
+        self.final_state = final_state # Keep the LED in the final state after cleanup
 
     def set_current(self, current):
         """Set the current for the LED."""
@@ -446,7 +461,11 @@ class LED:
             self.program.join()  # Ensure the thread has terminated
             self.logger.log(f"LED program for {self.name} terminated", log_level=5)
 
-        self.turn_off()
+        # By default, turn off the LED, but if final_state is True, keep it in the final state
+        if self.final_state:
+            pass  # Keep the LED in the final state
+        else:
+            self.turn_off()
 
     def pause_process(self):
         """Pause the blinking process."""

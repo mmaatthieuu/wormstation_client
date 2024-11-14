@@ -1,5 +1,6 @@
 import argparse
 import time
+import threading
 from src.led_controller import LightController  # Adjust the path based on your actual file structure
 from src.log import FakeLogger  # Assuming you have the FakeLogger or another logger implementation
 
@@ -24,36 +25,56 @@ def parse_args():
     return parser.parse_args()
 
 
+def monitor_led(light_controller, color):
+    """Monitor the LED and shut it down after 3 seconds if current > 37.5mA."""
+    time.sleep(3)  # Wait for 3 seconds
+    if light_controller[color].is_on:  # Check if the LED is still on
+        light_controller[color].turn_off()
+        print(f"Warning: {color} LED automatically turned off after 3 seconds due to high current.")
+
+
 def switch_led(color, state, current):
     """Switch the specified LED on or off with the specified current."""
     logger = FakeLogger()  # Replace with your actual logger if needed
-    light_controller = LightController(logger=logger)  # Replace with your actual LightController
+    light_controller = LightController(logger=logger, keep_final_state=True)
+
+    # Wait until the controller is fully initialized
+    light_controller.wait_until_ready()
 
     # Add the LED with the specified current if not already added
     if color not in light_controller.leds:
-        light_controller.add_LED(name=color, channel=light_controller.leds[color].channel, current=current)
-    else:
-        light_controller[color].set_current(current)
+        # Since `channel` is unknown without the LED, use a default (adjust if needed)
+        channel = {"IR": 0, "Orange": 1, "Blue": 2}.get(color, None)
+        if channel is not None:
+            light_controller.add_LED(name=color, channel=channel, current=current, final_state=True)
+        else:
+            print(f"Error: '{color}' is not a valid LED color. Available options: IR, Orange, Blue.")
+            return
 
     # Turn LED on or off based on user input
     try:
         if state:
             light_controller[color].turn_on()
-            # Do not close light_controller if the LED is turned on, to keep it on
             print(f"{color} LED is turned on with {current}.")
+
+            # Start the timer if the LED is Orange or Blue with current > 37.5mA
+            if color in ["Orange", "Blue"] and float(current.replace('mA', '')) > 37.5:
+                timer_thread = threading.Thread(target=monitor_led, args=(light_controller, color), daemon=True)
+                timer_thread.start()
+
         else:
             light_controller[color].turn_off()
             print(f"{color} LED is turned off.")
-            # Close the light controller to clean up if the LED is turned off
-            light_controller.close()
 
-    except KeyError:
-        print(f"Error: '{color}' is not a valid LED color. Available options: IR, Orange, Blue.")
     except Exception as e:
         print(f"An error occurred: {e}")
-        # Always close the light_controller in case of error
-        light_controller.close()
 
+    finally:
+        # Wait for timer thread to complete if it was created
+        if 'timer_thread' in locals():
+            timer_thread.join()
+
+        light_controller.close()
 
 
 def main():
