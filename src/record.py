@@ -202,10 +202,12 @@ class Recorder:
             #                                                                      self.parameters["time_interval"],
             #                                                                      self.parameters["timeout"]))
 
-
-            self.lights["IR"].run_led_timer(duration=self.parameters["illumination_pulse"] / 1000,
-                                       period=self.parameters["time_interval"],
-                                       timeout=self.parameters["timeout"])
+            try:
+                self.lights["IR"].run_led_timer(duration=self.parameters["illumination_pulse"] / 1000,
+                                           period=self.parameters["time_interval"],
+                                           timeout=self.parameters["timeout"])
+            except AttributeError:
+                self.logger.log("Illumination board not connected", log_level=3)
 
             #self.ir_leds.turn_on()
 
