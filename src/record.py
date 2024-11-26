@@ -216,7 +216,10 @@ class Recorder:
         else:
             # In case of preview, turn on IR LED to see something
             # self.ir_leds.turn_on()
-            self.lights["IR"].turn_on()
+            try:
+                self.lights["IR"].turn_on()
+            except AttributeError:
+                self.logger.log("Illumination board not connected", log_level=3)
 
         self.initial_time = time.time()
 
@@ -230,7 +233,7 @@ class Recorder:
                                              blinking=True,
                                              blinking_period=self.parameters["time_interval"])
 
-            except:
+            except KeyError:
                 self.logger.log("Optogenetic parameters not correctly set", log_level=3)
 
                 self.lights["Orange"].run_led_timer(duration=self.parameters["pulse_duration"],
@@ -238,6 +241,9 @@ class Recorder:
                                                  timeout=self.parameters["timeout"],
                                                  blinking=True,
                                                  blinking_period=self.parameters["time_interval"])
+
+            except AttributeError:
+                self.logger.log("Illumination board not connected", log_level=3)
 
         # self.create_output_folder()
 
