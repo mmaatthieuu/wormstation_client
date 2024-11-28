@@ -20,23 +20,23 @@ def parse_args():
     )
     parser.add_argument(
         '--current', '-a', type=str, default='37.5mA',
-        help='Current for the LED. Available values: 7.5mA, 12.5mA, 25mA, 37.5mA, 50mA, 75mA, 100mA (default: 37.5mA)'
+        help='Current for the LED. Available values: 7.5mA, 12.5mA, 25mA, 37.5mA, 50mA, 75mA, 100mA, max (default: 37.5mA)'
     )
     return parser.parse_args()
 
 
 def monitor_led(light_controller, color):
     """Monitor the LED and shut it down after 3 seconds if current > 37.5mA."""
-    time.sleep(3)  # Wait for 3 seconds
+    time.sleep(5)  # Wait for 3 seconds
     if light_controller[color].is_on:  # Check if the LED is still on
         light_controller[color].turn_off()
-        print(f"Warning: {color} LED automatically turned off after 3 seconds due to high current.")
+        print(f"Warning: {color} LED automatically turned off after 5 seconds due to high current.")
 
 
 def switch_led(color, state, current):
     """Switch the specified LED on or off with the specified current."""
     logger = FakeLogger()  # Replace with your actual logger if needed
-    light_controller = LightController(logger=logger, keep_final_state=True)
+    light_controller = LightController(logger=logger, empty=True, keep_final_state=True)
 
     # Wait until the controller is fully initialized
     light_controller.wait_until_ready()
@@ -58,10 +58,13 @@ def switch_led(color, state, current):
             print(f"{color} LED is turned on with {current}.")
 
             # Start the timer if the LED is Orange or Blue with current > 37.5mA
-            if color in ["Orange", "Blue"] and float(current.replace('mA', '')) > 37.5:
+            try:
+                if color in ["Orange", "Blue"] and float(current.replace('mA', '')) > 37.5:
+                    timer_thread = threading.Thread(target=monitor_led, args=(light_controller, color), daemon=True)
+                    timer_thread.start()
+            except ValueError:
                 timer_thread = threading.Thread(target=monitor_led, args=(light_controller, color), daemon=True)
                 timer_thread.start()
-
         else:
             light_controller[color].turn_off()
             print(f"{color} LED is turned off.")
@@ -83,20 +86,28 @@ def main():
 
     # Validate the color argument
     valid_colors = ['IR', 'Orange', 'Blue']
-    color = args.color.capitalize()  # Capitalize to match dictionary keys
+    color = args.color.strip()  # Remove extra spaces
 
-    if color not in valid_colors:
+    # Match the input with the valid colors
+    if color.upper() == "IR":
+        color = "IR"
+    elif color.lower() == "orange":
+        color = "Orange"
+    elif color.lower() == "blue":
+        color = "Blue"
+    else:
         print(f"Error: Invalid color '{args.color}'. Available colors are: {', '.join(valid_colors)}")
         return
 
     # Validate the current argument
-    valid_currents = ['7.5mA', '12.5mA', '25mA', '37.5mA', '50mA', '75mA', '100mA']
+    valid_currents = ['7.5mA', '12.5mA', '25mA', '37.5mA', '50mA', '75mA', '100mA', 'max']
     if args.current not in valid_currents:
         print(f"Error: Invalid current '{args.current}'. Available values are: {', '.join(valid_currents)}")
         return
 
     # Switch the LED based on the state (0 = off, 1 = on)
     switch_led(color, args.state, args.current)
+
 
 
 if __name__ == "__main__":
