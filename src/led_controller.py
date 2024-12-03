@@ -38,13 +38,13 @@ class LightController:
                               logger=self.logger,
                               final_state=keep_final_state),
                     "Orange": LED(usb_handler=self.spi_controller.usb_handler,
-                                  channel=1, current='100mA',
+                                  channel=1, current='max',
                                   name='Orange',
                                   logger=self.logger,
                                   final_state=keep_final_state),
                     "Blue": LED(usb_handler=self.spi_controller.usb_handler,
                                 channel=2,
-                                current='100mA',
+                                current='max',
                                 name='Blue',
                                 logger=self.logger,
                                 final_state=keep_final_state)
@@ -295,9 +295,19 @@ class LEDDriver:
         if self.usb_handler is not None:
             self.channel = channel  # SPI channel
             self.current_level = self.read_current_input(current)
-            self.initialize()
 
-    def initialize(self):
+            print(f'Input current: {current}')
+            print(f"Current level read from input: {self.current_level}")
+
+            num_lines = self.get_max_num_lines()
+
+            self.initialize(num_lines)
+
+    def initialize(self, num_lines):
+        # Ensure num_lines is valid (1-16 as LP5860T supports up to 16 scan lines)
+        if num_lines < 0 or num_lines > 11:
+            raise ValueError("num_lines must be between 0 and 11")
+
         # Use the new function to write multiple registers
         self.write_multiple_registers({
             0x000: 0x01,  # Chip Enable
@@ -306,23 +316,44 @@ class LEDDriver:
         time.sleep(0.001)
         self.set_max_current(self.current_level)
 
-        # Set data mode (0x58 for mode 1, 0x5a for mode 2, 0x5c for mode 3)
-        self.write_register(0x001, 0x5a)
+        # Set the value for byte_reg1
+        max_line_num = num_lines << 3  # Shift num_lines - 1 into bits 6 to 3
+        byte_reg1 = 0b00000011 | max_line_num  # Preserve bits 0 and 1, set bits 6-3 for max_line_num
+
+        self.write_register(0x001, byte_reg1)
+
+        # Set the value for byte_reg2 to maximize the light output
+        byte_reg2 = 0b00001000
+        self.write_register(0x002, byte_reg2)
+
         time.sleep(0.001)
+
+
         self.write_multiple_registers({
             0x009: 0x7F,  # Set Color Current to 100%
             0x00A: 0x7F,
             0x00B: 0x7F
         })
 
+    def get_max_num_lines(self):
+        """Get the maximum number of scan lines supported by the LP5860T."""
+        """This is specific for the current PCB design."""
+        if self.channel == 0:
+            return 0 # IR LED are not connected to the switch scan so it does not change anything
+        if self.channel == 1:
+            return 9 # Orange LED are connected 9 switch scan lines
+        if self.channel == 2:
+            return 10
+
     def set_max_current(self, current_level):
         """Set the maximum current in the Dev_config3 register."""
         if self.usb_handler is not None:
-            if current_level < 0 or current_level > 6:
+            if current_level < 0 or current_level > 7:
                 print("Invalid current level. Please provide a value between 0 and 6.")
                 return
             default_value = 0x47
             new_value = (default_value & 0b11110001) | ((current_level << 1) & 0b00001110)
+
             self.write_register(0x004, new_value)
             print(f"Set maximum current to level {current_level}")
 
@@ -367,15 +398,21 @@ class LEDDriver:
 
     def read_register(self, register, print_result=False):
         """Read data from a specific register on the SPI device."""
+        """Does not work as expected"""
         if self.usb_handler is not None:
             address_byte1 = (register >> 2) & 0xFF
             address_byte2 = ((register & 0x03) << 6)
 
             result = self.usb_handler.spi_exchange([address_byte1, address_byte2, 0x00], channel=self.channel,
                                                    duplex=True)
+
             if print_result:
                 print(f"Read result from register {hex(register)}: {hex(result[2])}")
-            return result[2]
+                return result[2]
+            else:
+                print(f'Result is {result}')
+                return result
+
 
     def set_pwm_brightness(self, brightness):
         """Set the PWM brightness for all dots."""
@@ -383,7 +420,7 @@ class LEDDriver:
         self.write_multiple_registers(registers)
 
     def read_current_input(self, current):
-        current_levels = {'7.5mA': 0, '12.5mA': 1, '25mA': 2, '37.5mA': 3, '50mA': 4, '75mA': 5, '100mA': 6}
+        current_levels = {'7.5mA': 0, '12.5mA': 1, '25mA': 2, '37.5mA': 3, '50mA': 4, '75mA': 5, '100mA': 6, 'max': 7}
 
         # Ensure current is a string if it's not already
         current = str(current)
