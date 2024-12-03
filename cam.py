@@ -109,50 +109,44 @@ def sigusr1_handler(signal, frame):
 
 
 def main():
-    # Set up signal handlers
-    signal.signal(signal.SIGTERM, sigterm_handler)
-    signal.signal(signal.SIGUSR1, sigusr1_handler)  # Custom signal handler for capturing a new frame
-
-    parameters = Parameters(sys.argv[1])
-
-    global recorder
-    recorder = Recorder(parameters=parameters, git_version=get_git_version())
-
-    #picamera.PiCamera.CAPTURE_TIMEOUT = 3
-
-    #profile = cProfile.Profile()
-
     try:
+        # Set up signal handlers
+        signal.signal(signal.SIGTERM, sigterm_handler)
+        signal.signal(signal.SIGUSR1, sigusr1_handler)
 
-        #print("Start recording")
-        #profile.runcall(recorder.start_recording,)
-        recorder.start_recording()
-        #ps = pstats.Stats(profile)
-        #ps.sort_stats('time')
-        #ps.print_stats(10)
-        #print("end")
+        # Ensure the user provides a parameters file as an argument
+        if len(sys.argv) <= 1:
+            print("Error: You must provide a JSON file containing parameters.")
+            print("Usage: python3 cam.py <parameters_file>")
+            sys.exit(1)
 
+        # Load parameters
+        parameters_file = sys.argv[1]
+        parameters = Parameters(parameters_file)
 
-    except KeyboardInterrupt:
+        global recorder
+        recorder = Recorder(parameters=parameters, git_version=get_git_version())
 
-        recorder.logger.log("Keyboard interrupt. Stopping recording.")
-        print("Keyboard interrupt. Stopping recording.")
-        del recorder
+        try:
+            recorder.start_recording()
+        except KeyboardInterrupt:
+            recorder.logger.log("Keyboard interrupt. Stopping recording.")
+            print("Keyboard interrupt. Stopping recording.")
+        except CrashTimeOutException:
+            print("#DEBUG Crash time out exception")
+        finally:
+            del recorder
 
+    except FileNotFoundError as e:
+        print(e)
+        sys.exit(1)
+    except ValueError as e:
+        print(e)
+        sys.exit(1)
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        sys.exit(1)
 
-
-    # else:
-    #     log("\nOops... Something went wrong.\n")
-    except CrashTimeOutException as e:
-        print("#DEBUG Crash time out exception")
-
-    else:
-
-        del recorder
-
-        if parameters["verbosity_level"]>0:
-            pass
-            #log("Over.")
 
 if __name__ == "__main__":
     main()
