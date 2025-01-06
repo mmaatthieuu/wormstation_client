@@ -382,13 +382,14 @@ class Recorder:
         # print(delay)
         # print(f'current: {current_timedelta}, exp: {expected_timedelta_for_current_frame}, delay: {delay}')
         if delay < 0:
+            # Recording on time. Wait for the next frame
+
+            self.logger.log("Waiting for %fs before next frame" % -delay, log_level=5)
             try:
                 time.sleep(-delay)
             except BlockingIOError:
-                self.logger.log("\n\n it failed but still trying")
+                self.logger.log("\n\n it failed but still trying", log_level=2)
                 time.sleep(-delay)
-            if self.parameters["verbosity_level"] >= 2:
-                self.logger.log("Waiting for %fs" % -delay)
         elif delay < 0.005:  # We need some tolerance in this world...
             pass  # And go on directly with frame capture
         else:

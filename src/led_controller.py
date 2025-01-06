@@ -473,6 +473,8 @@ class LED:
         self.is_on = None
         self.program = None
         self.running = threading.Event()
+        self.pause_event = threading.Event()
+        self.pause_event.set()  # Initially set to allow execution
         self.final_state = final_state # Keep the LED in the final state after cleanup
 
     def set_current(self, current):
@@ -491,10 +493,10 @@ class LED:
 
     def cleanup(self):
         """Cleanup the LED processes and turn it off."""
-
         if self.program and self.program.is_alive():
             self.logger.log(f"Terminating LED program for {self.name}", log_level=5)
             self.running.clear()
+            self.pause_event.set()  # Ensure it doesn't hang on pause
             self.program.join()  # Ensure the thread has terminated
             self.logger.log(f"LED program for {self.name} terminated", log_level=5)
 
@@ -508,13 +510,13 @@ class LED:
         """Pause the blinking process."""
         if self.program and self.program.is_alive():
             self.logger.log(f'Pausing blinking of {self.name} LED', log_level=5)
-            self.running.clear()
+            self.pause_event.clear()
 
     def resume_process(self):
         """Resume the blinking process."""
         if self.program and self.program.is_alive():
             self.logger.log(f'Resuming blinking of {self.name} LED', log_level=5)
-            self.running.set()
+            self.pause_event.set()
 
     def turn_on_for_n_sec(self, duration):
         self.turn_on()
@@ -563,6 +565,7 @@ class LED:
             end_time = time.time() + timeout
 
             while time.time() < end_time and self.running.is_set():
+                self.pause_event.wait()  # Wait for the pause event to be set
                 if blinking:
                     self.wait_until_next_activation(period, 0.5)
                     if not self.running.is_set():
