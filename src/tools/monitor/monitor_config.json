@@ -1,0 +1,7 @@
+{
+  "recording_path": "/path/to/folder",
+  "time_window_to_check_in_days": 3,
+  "log_file_extension": ".out",
+  "video_file_extensions": [".mkv", ".mp4"],
+  "ignored_folders_file": "ignored_folders.txt"
+}

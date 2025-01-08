@@ -1,0 +1,114 @@
+Wormstation Monitor
+====================
+
+This project monitors and validates recordings for wormstations. It checks log files and video files, ensures the recordings meet expected parameters, and sends email alerts in case of discrepancies.
+
+Getting Started
+---------------
+
+Follow the steps below to configure and run the Wormstation Monitor.
+
+1. Configuration File (`monitor_config.json`)
+---------------------------------------------
+
+The `monitor_config.json` file contains all the necessary settings for the script. Below is an example of the file:
+
+Example `monitor_config.json`:
+
+{
+  "recording_path": "/path/to/folder",
+  "time_window_to_check_in_days": 3,
+  "log_file_extension": ".out",
+  "video_file_extensions": [".mkv", ".mp4"],
+  "ignored_folders_file": "ignored_folders.txt"
+}
+
+
+Configuration Details:
+
+- `recording_path`: Path to the folder containing recording directories.
+- `time_window_to_check_in_days`: The number of days to look back for recordings to monitor.
+- `log_file_extension`: File extension for the log files (e.g., `.out`).
+- `video_file_extensions`: List of video file extensions to monitor (e.g., `.mkv`, `.mp4`).
+- `ignored_folders_file`: Path to the file containing a list of folders to ignore during monitoring.
+
+
+2. Environment Variables (`.env`)
+---------------------------------
+
+To store sensitive information securely (like email credentials), create a `.env` file in the project directory.
+
+Example `.env` file:
+
+    EMAIL_USER=your_email@example.com
+    EMAIL_PASSWORD=your_email_password
+
+
+Instructions:
+
+- Create a file named `.env` in the scrpts directory.
+- Add the email username and password as shown above.
+- Ensure the `.env` file is not included in version control (e.g., use a `.gitignore` file).
+
+3. Setting Up Ignored Folders
+-----------------------------
+
+Create an `ignored_folders.txt` file to specify folders that should be ignored during monitoring.
+
+Example `ignored_folders.txt`:
+
+    /path/to/folder1
+    /path/to/folder2
+
+Each line should contain the absolute path to a folder to be ignored.
+
+4. Running the Script
+---------------------
+
+Steps to Run:
+
+1. Install required Python packages:
+pip install -r requirements.txt
+
+2. Ensure the `monitor_config.json`, `.env`, and `ignored_folders.txt` files are properly set up.
+
+3. Run the script:
+python check_wormstation_status.py
+
+
+This script is intended to be run regularly using a cron job. For example, to run the script daily at midnight, add the following line to your crontab:
+
+0 * * * * /path/to/python /path/to/check_wormstation_status.py
+
+
+5. Email Alerts
+---------------
+
+How It Works:
+
+- The script sends an email alert if discrepancies are detected in the recordings.
+- Recipients will receive instructions on how to ignore specific folders by replying with the text:
+IGNORE:/path/to/folder
+
+
+6. Security Tips
+----------------
+
+- Do not hardcode sensitive information in the script.
+- Use environment variables to store credentials securely.
+- Limit access to the `.env` and `ignored_folders.txt` files.
+
+7. Dependencies
+---------------
+
+- Python 3.x
+- `python-dotenv` for loading environment variables:
+pip install python-dotenv
+
+
+For questions or support, feel free to contact the project maintainer. Happy monitoring!
+
+
+
+
+
