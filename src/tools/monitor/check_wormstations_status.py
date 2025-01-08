@@ -249,7 +249,11 @@ class WormstationMonitor:
 if __name__ == "__main__":
 
     # Load configuration
-    config = load_config("monitor_config.json")
+    try:
+        config = load_config("monitor_config.json")
+    except FileNotFoundError:
+        config = load_config(sys.argv[1])
+
 
     # Load environment variables
     load_dotenv()
