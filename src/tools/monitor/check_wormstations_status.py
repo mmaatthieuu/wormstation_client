@@ -263,7 +263,7 @@ if __name__ == "__main__":
         raise ValueError("Email credentials are missing. Please set them in environment variables or a .env file.")
 
     # Initialize components
-    email_client = EmailClient(EMAIL_USER, EMAIL_PASSWORD)
+    email_client = EmailClient(EMAIL_USER, EMAIL_PASSWORD, recipient_list=config["recipient_list"])
     ignored_manager = IgnoredFoldersManager(config["ignored_folders_file"])
     monitor = WormstationMonitor(config, email_client, ignored_manager)
 
