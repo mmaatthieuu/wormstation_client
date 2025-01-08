@@ -26,11 +26,7 @@ class EmailClient:
         self.email_password = email_password
         self.imap_connection = None
 
-        print("recipient list", recipient_list)
-
         self.recipient_list = self.load_recipient_list(recipient_list)
-
-        print("recipient list", self.recipient_list)
 
     def load_recipient_list(self, recipient_list_file):
         """
