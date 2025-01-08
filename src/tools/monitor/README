@@ -67,6 +67,9 @@ Each line should contain the absolute path to a folder to be ignored.
 
 Steps to Run:
 
+Run piworm install script to install required packages
+./INSTALL.sh
+
 1. Install required Python packages:
 pip install -r requirements.txt
 
@@ -78,7 +81,7 @@ python check_wormstation_status.py
 
 This script is intended to be run regularly using a cron job. For example, to run the script daily at midnight, add the following line to your crontab:
 
-0 * * * * /path/to/python /path/to/check_wormstation_status.py
+0 * * * * /path/to/python /path/to/check_wormstation_status.py /path/to/monitor_config.json
 
 
 5. Email Alerts
