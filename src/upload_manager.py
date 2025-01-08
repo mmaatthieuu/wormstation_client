@@ -11,8 +11,6 @@ from multiprocessing import Process
 from datetime import datetime
 from socket import gethostname
 
-from src.analyse import Analyser
-
 
 class UploadManager:
     def __init__(self, remote_server, remote_dir, recording_name, local_dir=None, logger=None):
@@ -139,6 +137,9 @@ class UploadManager:
         output_files = []
 
         if analyze:
+
+            from src.analyse import Analyser
+
             analyser = Analyser(logger=self.logger)
             output_files = analyser.run(video_path=compressed_file)
 
