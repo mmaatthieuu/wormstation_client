@@ -2,9 +2,14 @@ import json
 import re
 import os
 from datetime import datetime, timedelta
+import sys
 
 from dotenv import load_dotenv
 from email_manager import EmailClient, IgnoredFoldersManager
+
+# Add the root directory of the project to the Python path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
+
 from src.upload_manager import SMBManager
 
 
