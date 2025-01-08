@@ -289,7 +289,7 @@ class UploadManager:
 
 
 class SMBManager(UploadManager):
-    def __init__(self, nas_server, share_name, credentials_file, working_dir, recording_name, local_dir=None, logger=None):
+    def __init__(self, nas_server, share_name, credentials_file, working_dir, recording_name=None, local_dir=None, logger=None):
         local_dir = local_dir if local_dir else f"/home/{os.getlogin()}/NAS"
         super().__init__(nas_server, working_dir, recording_name, local_dir, logger)
         self.share_name = share_name

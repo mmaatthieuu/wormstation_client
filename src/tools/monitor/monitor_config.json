@@ -3,5 +3,9 @@
   "time_window_to_check_in_days": 3,
   "log_file_extension": ".out",
   "video_file_extensions": [".mkv", ".mp4"],
-  "ignored_folders_file": "ignored_folders.txt"
+  "ignored_folders_file": "ignored_folders.txt",
+  "nas_server": "//lpbsnas1.epfl.ch",
+  "share_name": "LPBS2",
+  "credentials_file": "/etc/.smbpicreds",
+  "smb_dir": "Misc/Matthieu-Schmidt/WORMSTATION_RECORDINGS/"
 }

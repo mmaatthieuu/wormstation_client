@@ -5,6 +5,8 @@ from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
 from email_manager import EmailClient, IgnoredFoldersManager
+from src.upload_manager import SMBManager
+
 
 # # Constants for configuration
 # RECORDING_PATH = "/path/to/folder"
@@ -255,6 +257,15 @@ if __name__ == "__main__":
     email_client = EmailClient(EMAIL_USER, EMAIL_PASSWORD)
     ignored_manager = IgnoredFoldersManager(config["ignored_folders_file"])
     monitor = WormstationMonitor(config, email_client, ignored_manager)
+
+    uploader = SMBManager(nas_server=config["nas_server"],
+                          share_name=config["share_name"],
+                          credentials_file=config["credentials_file"],
+                          working_dir=config["smb_dir"])
+
+    # Check if NAS is already mounted, if not mount it
+    if not uploader.is_mounted():
+        uploader.mount()
 
     # Run the monitor
     try:
