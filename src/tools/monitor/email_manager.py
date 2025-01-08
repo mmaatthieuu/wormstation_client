@@ -30,6 +30,8 @@ class EmailClient:
 
         self.recipient_list = self.load_recipient_list(recipient_list)
 
+        print("recipient list", self.recipient_list)
+
     def load_recipient_list(self, recipient_list_file):
         """
         Loads recipient email addresses from a file.
