@@ -116,14 +116,15 @@ class WormstationMonitor:
         videos_per_session = parameters.get("record_for_s") / parameters.get("compress") / time_interval
         return int(sessions * videos_per_session)
 
-    @staticmethod
-    def get_excluded_folders(file_path='ignored_folders.txt'):
+    def get_excluded_folders(self):
         """
         Reads a file containing paths to be ignored.
 
-        :param file_path: Path to the file containing ignored folder paths.
         :return: Set of normalized absolute folder paths.
         """
+
+        file_path = self.ignored_manager.ignored_folders_file
+
         if not os.path.exists(file_path):
             return set()
         with open(file_path, "r") as f:

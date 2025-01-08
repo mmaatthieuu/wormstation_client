@@ -1,9 +1,10 @@
 {
-  "recording_path": "/path/to/folder",
-  "time_window_to_check_in_days": 3,
+  "recording_path": "/home/scientist/NAS/Misc/Matthieu-Schmidt/WORMSTATION_RECORDINGS",
+  "time_window_to_check_in_days": 30,
   "log_file_extension": ".out",
   "video_file_extensions": [".mkv", ".mp4"],
-  "ignored_folders_file": "ignored_folders.txt",
+  "ignored_folders_file": "/home/scientist/piworm/src/tools/monitor/ignored_folders.txt",
+  "recipient_list": "/home/scientist/piworm/src/tools/monitor/recipient_list.txt",
   "nas_server": "//lpbsnas1.epfl.ch",
   "share_name": "LPBS2",
   "credentials_file": "/etc/.smbpicreds",
