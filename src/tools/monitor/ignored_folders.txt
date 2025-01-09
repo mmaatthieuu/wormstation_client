@@ -1,7 +1,0 @@
-/home/scientist/NAS/Misc/Matthieu-Schmidt/WORMSTATION_RECORDINGS/20250106_1623_AML67+MT15434_ATR_97h_30s_1h/piworm12
-/home/scientist/NAS/Misc/Matthieu-Schmidt/WORMSTATION_RECORDINGS/20250106_1752_N2-lifespan-FUDR+Terbinafine_3weeks-30m-6h/piworm16
-/home/scientist/NAS/Misc/Matthieu-Schmidt/WORMSTATION_RECORDINGS/20241226_1140_N2-lifespan-FUDR+Terbinafine_3weeks-30m-6h_Continuation-Trash
-/home/scientist/NAS/Misc/Matthieu-Schmidt/WORMSTATION_RECORDINGS/20250106_1752_N2-lifespan-FUDR+Terbinafine_3weeks-30m-6h/piworm13
-/home/scientist/NAS/Misc/Matthieu-Schmidt/WORMSTATION_RECORDINGS/20241226_1407_N2-lifespan-FUDR+Terbinafine_3weeks-30m-6h_Continuation_2-Trash
-/home/scientist/NAS/Misc/Matthieu-Schmidt/WORMSTATION_RECORDINGS/20241224_1726_N2-lifespan-FUDR+Terbinafine_3weeks-30m-6h-Trash
-/home/scientist/NAS/Misc/Matthieu-Schmidt/WORMSTATION_RECORDINGS/20241227_1634_N2-lifespan-FUDR+Terbinafine_3weeks-30m-6h
