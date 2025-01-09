@@ -127,3 +127,5 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+src/tools/monitor/ignored_folders.txt
+src/tools/monitor/recipient_list.txt
