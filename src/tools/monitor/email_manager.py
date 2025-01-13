@@ -33,8 +33,13 @@ class EmailClient:
         Loads recipient email addresses from a file.
         """
         if not os.path.exists(recipient_list_file):
+            print(f"Recipient list file not found: {recipient_list_file}")
             return []
         with open(recipient_list_file, "r") as f:
+            # If the file is empty, print a warning and return an empty list
+            if f.read().strip() == "":
+                print("Recipient list file is empty.")
+                return []
             return [line.strip() for line in f]
 
 
