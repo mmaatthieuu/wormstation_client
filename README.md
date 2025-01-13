@@ -22,6 +22,7 @@ This software is made to be remotely controlled by the
 - **Remote Storage:** Upload recordings to a NAS or remote server via SMB or SSH.
 - **Log Management:** Comprehensive logging for debugging and monitoring.
 - **Hardware Integration:** Seamlessly integrates with FT232H for SPI communication.
+- **Monitoring Tools:** Monitor the recording processes and system status.
 
 ---
 

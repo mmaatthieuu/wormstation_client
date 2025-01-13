@@ -40,7 +40,11 @@ class EmailClient:
             if f.read().strip() == "":
                 print("Recipient list file is empty.")
                 return []
-            return [line.strip() for line in f]
+            # Otherwise, read the lines, print the recipient addresses, and return the list
+            f.seek(0) # Reset the file pointer to the beginning
+            recipient_list = [line.strip() for line in f]
+            print(f"Recipient list loaded: {recipient_list}")
+            return recipient_list
 
 
     def connect_imap(self):
