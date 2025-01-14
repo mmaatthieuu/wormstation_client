@@ -139,89 +139,21 @@ echo "Disabling services with security vulnerabilities..."
 sudo systemctl stop cups-browsed.service
 sudo systemctl disable cups-browsed.service
 
-echo "Installing python dependencies..."
+# Install Python dependencies from requirements.txt
+echo "Installing Python dependencies from requirements.txt..."
 
-# Initialize the list of missing libraries
-missing_libs=()
-
-# Check if opencv is installed
-if ! python3 -c "import cv2" &> /dev/null; then
-    echo "OpenCV is not installed."
-    missing_libs+=("opencv-python")
-else
-    echo "OpenCV installation found."
-fi
-
-# Check if any version of numpy 1.26.* is installed
-if ! python3 -c "import re; import numpy; assert re.match(r'1\.26\.\d+', numpy.__version__)" &> /dev/null; then
-    echo "numpy 1.26.x is not installed."
-    missing_libs+=("numpy==1.26.3")
-else
-    echo "numpy 1.26.x installation found."
-fi
-
-# Check if pandas is installed
-if ! python3 -c "import pandas" &> /dev/null; then
-    echo "pandas is not installed."
-    missing_libs+=("pandas")
-else
-    echo "pandas installation found."
-fi
-
-# Check if picamera2 is installed
-if ! python3 -c "import picamera2" &> /dev/null; then
-    echo "picamera2 is not installed."
-    missing_libs+=("picamera2==0.3.12")
-else
-    echo "picamera installation found."
-fi
-
-# Check if trackpy is installed
-if ! python3 -c "import trackpy" &> /dev/null; then
-    echo "trackpy is not installed."
-    missing_libs+=("trackpy")
-else
-    echo "trackpy installation found."
-fi
-
-# Check if pyftdi is installed
-if ! python3 -c "import pyftdi" &> /dev/null; then
-    echo "pyftdi is not installed."
-    missing_libs+=("pyftdi")
-else
-    echo "pyftdi installation found."
-fi
-
-# Check if matplotlib is installed
-if ! python3 -c "import matplotlib" &> /dev/null; then
-    echo "matplotlib is not installed."
-    missing_libs+=("matplotlib")
-else
-    echo "matplotlib installation found."
-fi
-
-# Check if tqdm is installed
-if ! python3 -c "import tqdm" &> /dev/null; then
-    echo "tqdm is not installed."
-    missing_libs+=("tqdm")
-else
-    echo "tqdm installation found."
-fi
-
-# Check if there are any missing libraries
-if [ ${#missing_libs[@]} -eq 0 ]; then
-    echo "All required libraries are already installed."
-else
-    echo "The following libraries are missing: ${missing_libs[@]}"
+if [ -f "$script_dir/requirements.txt" ]; then
     if [ "$yes_flag" = true ]; then
-        pip3 install "${missing_libs[@]}"
+        pip3 install -r "$script_dir/requirements.txt"
     else
-        read -p "Do you want to install the missing libraries? (y/n): " install_libs
+        read -p "Do you want to install the Python dependencies from requirements.txt? (y/n): " install_libs
         install_libs=${install_libs:-y}
         if [[ "$install_libs" =~ ^[Yy]$ ]]; then
-            pip3 install "${missing_libs[@]}"
+            pip3 install -r "$script_dir/requirements.txt"
         fi
     fi
+else
+    echo "ERROR: requirements.txt not found in $script_dir. Python dependencies were not installed."
 fi
 
 # Check if /etc/.smbpicreds exists

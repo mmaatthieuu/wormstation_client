@@ -1,0 +1,8 @@
+opencv-python==4.10.0.84
+numpy==1.26.3
+pandas==2.2.2
+picamera2==0.3.12
+trackpy==0.6.3
+pyftdi==0.55.4
+matplotlib==3.9.0
+tqdm
