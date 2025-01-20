@@ -538,6 +538,11 @@ class Recorder:
         os.chdir(self.parameters["local_tmp_dir"])
         return os.getcwd()
 
+    def get_tmp_recording_folder(self):
+        # get home path
+        home = str(Path.home())
+        return f'{home}/{self.parameters["local_tmp_dir"]}'
+
     def get_pause_mode(self):
         if self.parameters["record_for_s"] == 0 or self.parameters["record_every_h"] == 0:
             return False

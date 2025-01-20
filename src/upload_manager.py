@@ -106,7 +106,12 @@ class UploadManager:
             return False
 
     def start_async_compression_and_upload(self, dir_to_compress, format):
-        self.logger.log(f'Compressing and uploading {dir_to_compress}, with format {format}', log_level=5)
+
+        if self.compress_process and self.compress_process.is_alive():
+            self.logger.log("Compression already in progress, waiting for the previous compression to end", log_level=3)
+            self.compress_process.join() # Wait for the previous compression to end
+
+        self.logger.log(f'Compressing and uploading {dir_to_compress}, with format {format}', log_level=3)
         # log("Dest path : %s " % output_folder)
         # self.save_process.join()
         self.compress_process = Process(target=self.compress_analyze_and_upload,
@@ -118,60 +123,78 @@ class UploadManager:
 
     def wait_for_compression(self):
         self.compress_process.join()
+
     def compress_analyze_and_upload(self, folder_name, format, analyze=False):
-        # self.logger.log("start compression")
         compressed_file = self.compress(folder_name=folder_name, format=format)
 
-        # Check if the file has been created
-        if self.check_compression(compressed_file):
-            # The compression was successful
-            # Remove the original folder
+        # Check if the compressed file is valid
+        if not self.check_compression(compressed_file):
+            self.logger.log(f"Compression failed for {folder_name}. Original files retained.", log_level=1)
+            return False  # Exit early without deleting the original files
 
-            # The data are now saved as a movie, it is better to delete the pictures to avoid saturating the disk
-            # in case of failed upload
-            subprocess.run(['rm', '-rf', '%s' % folder_name])
-
-        # TODO: need to disentangle this mess (compression, analysis, upload)
-
-
+        # Perform analysis if required
         output_files = []
-
         if analyze:
-
             from src.analyse import Analyser
-
             analyser = Analyser(logger=self.logger)
             output_files = analyser.run(video_path=compressed_file)
-
         else:
             self.logger.log("Skipping Analysis", log_level=5)
             output_files = [compressed_file]
 
         self.logger.log(f"Output files : {output_files}", log_level=5)
 
+        # Upload the compressed file(s) and validate uploads
         for output_file in output_files:
-            # Upload the compressed file
+
+            # Check if NAS is mounted and accessible
+            if not self.is_mounted() or not self.is_accessible():
+                self.logger.log("Remote directory is not accessible, trying to mount it", log_level=2)
+                if not self.mount() or not self.is_accessible():
+                    self.logger.log("Failed to mount or remote directory is not accessible, skipping upload", log_level=1)
+                    return False
+
             self.upload(output_file, async_upload=False)
 
-            # Check if the file has been uploaded
-            if self.upload_check(output_file):
-                # The upload was successful
-                # Remove the compressed file
-                self.logger.log(f"Removing {output_file}", log_level=5)
-                subprocess.run(['rm', '-f', '%s' % output_file])
+            # Verify upload success before deleting compressed file
+            if not self.upload_check(output_file):
+                self.logger.log(f"Failed to upload {output_file}. Original files retained.", log_level=1)
+                return False  # Exit early without deleting original files or compressed files
 
+            # Remove the compressed file after successful upload
+            self.logger.log(f"Removing {output_file}", log_level=5)
+            pathlib.Path(output_file).unlink(missing_ok=True)
+
+        # Delete original folder only after all checks pass
+        self.logger.log(f"Removing original folder {folder_name}", log_level=5)
+        subprocess.run(['rm', '-rf', '%s' % folder_name])
+
+        # Upload remaining files
+        self.logger.log(f"Uploading remaining files in {folder_name}", log_level=5)
+        # get the folder name from the path of the compressed file
+        rec_folder = os.path.dirname(compressed_file)
+        self.upload_remaining_files(rec_folder)
+
+        return True
 
     def check_compression(self, compressed_file):
         # Check if the file has been created
         if not os.path.exists(compressed_file):
-            # The compression failed
-            self.logger.log("Compression failed (file not created)", log_level=1)
+            self.logger.log(f"Compression failed: {compressed_file} not created.", log_level=1)
             return False
+
         # Check if the file is empty
-        elif os.path.getsize(compressed_file) == 0:
-            # The compression failed
-            self.logger.log("Compression failed (file empty)", log_level=1)
+        if os.path.getsize(compressed_file) == 0:
+            self.logger.log(f"Compression failed: {compressed_file} is empty.", log_level=1)
             return False
+
+        # Verify video integrity with FFmpeg
+        check_cmd = ['ffmpeg', '-v', 'error', '-i', compressed_file, '-f', 'null', '-']
+        result = subprocess.run(check_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if result.returncode != 0:
+            self.logger.log(f"Compression failed: {compressed_file} is not a valid video.", log_level=1)
+            return False
+
         return True
 
     def compress(self, folder_name, format="tgz"):
@@ -210,8 +233,8 @@ class UploadManager:
 
         # Check if there are some not uploaded files
 
-        # Get list of files in the current directory
-        files = os.listdir(rec_folder)
+        # Get list of files in the current directory, excluding directories
+        files = [f for f in os.listdir(rec_folder) if os.path.isfile(os.path.join(rec_folder, f))]
 
         # Log files that are not uploaded
         self.logger.log(f"Files not uploaded : {files}", log_level=3)
@@ -222,7 +245,7 @@ class UploadManager:
                 # Upload the file to the NAS
                 upload_ok = self.upload(file_to_upload=file, async_upload=False)
                 # When upload is done, and successful, remove the file
-                if upload_ok:
+                if upload_ok and self.upload_check(file):
                     self.logger.log(f"File {file} uploaded successfully, deleting locally", log_level=3)
                     os.remove(file)
 
