@@ -35,8 +35,11 @@ def monitor_led(light_controller, color):
 
 def switch_led(color, state, current):
     """Switch the specified LED on or off with the specified current."""
+    """
+    This function is used to control the LED from Wormstation_controller
+    """
     logger = FakeLogger()  # Replace with your actual logger if needed
-    light_controller = LightController(logger=logger, empty=True, keep_final_state=True)
+    light_controller = LightController(logger=logger, empty=True, keep_final_state=True, enable_legacy_gpio_mode=True)
 
     # Wait until the controller is fully initialized
     light_controller.wait_until_ready()

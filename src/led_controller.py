@@ -32,6 +32,7 @@ class LightController:
         self.initialized = threading.Event()  # Use an event to signal initialization completion
         self.spi_controller = None
         self.leds_lock = threading.Lock()
+        self.legacy_gpio_mode = False
 
         # Start asynchronous initialization in a separate thread
         init_thread = threading.Thread(target=self.initialize, args=(empty,keep_final_state,enable_legacy_gpio_mode,))
@@ -73,6 +74,11 @@ class LightController:
                 self.device_connected = False
 
             if enable_legacy_gpio_mode:
+                """
+                Note: This is a fallback mechanism to use the legacy GPIO mode for controlling the LEDs.
+                This implementation can be improved as to will be used for the 3 over 4 devices not connected to USB
+                  PCB, even if the setup uses USB PCB (with the FT232H chip).
+                """
                 # Fallback to legacy GPIO mode
                 self.logger.log("Falling back to legacy GPIO mode.", log_level=3)
                 self.leds = {
@@ -80,6 +86,7 @@ class LightController:
                     "Orange": LEDLegacy(18, logger=self.logger, name='Orange', keep_state=keep_final_state),
                 }
                 self.device_connected = True
+                self.legacy_gpio_mode = True
 
         finally:
             self.initialized.set()  # Signal that initialization is complete
@@ -87,6 +94,10 @@ class LightController:
     def wait_until_ready(self):
         """Block until initialization is complete."""
         self.initialized.wait()
+
+    def legacy_mode(self):
+        """Check if the LightController is in legacy GPIO mode."""
+        return self.legacy_gpio_mode
 
     def __getitem__(self, name):
         """Allow accessing the LEDs via dictionary-like access."""
@@ -117,12 +128,18 @@ class LightController:
                 self.logger.log(f"LED with name '{name}' already exists.", log_level=2)
                 return
             if not self.device_connected:
-                self.logger.log("No USB device connected. Cannot add new LED.", log_level=3)
+                self.logger.log("No device connected. Cannot add new LED.", log_level=3)
                 return
 
-            self.leds[name] = LED(usb_handler=self.spi_controller.usb_handler, channel=channel, current=current, name=name,
-                                  logger=self.logger, final_state=final_state)
-            self.logger.log(f"Added new LED: {name} on channel {channel} with current {current}.", log_level=5)
+            if self.legacy_gpio_mode:
+                # Not very efficient, but this is a fallback mechanism for legacy PCB
+                gpio_pin = {"IR": 17, "Orange": 18, "Blue" : 18}.get(name)
+                self.leds[name] = LEDLegacy(_control_gpio_pin=gpio_pin, logger=self.logger, name=name, keep_state=final_state)
+                self.logger.log(f"Added new legacy LED: {name} on GPIO pin {gpio_pin}.", log_level=5)
+            else:
+                self.leds[name] = LED(usb_handler=self.spi_controller.usb_handler, channel=channel, current=current, name=name,
+                                      logger=self.logger, final_state=final_state)
+                self.logger.log(f"Added new LED: {name} on channel {channel} with current {current}.", log_level=5)
 
     def test(self):
         """Test the LEDs by turning them on for 2 seconds each."""
