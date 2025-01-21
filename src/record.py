@@ -130,7 +130,7 @@ class Recorder:
         self.git_version = git_version
 
         # Initialize the LEDs
-        self.lights = LightController(logger=self.logger)
+        self.lights = LightController(logger=self.logger, enable_legacy_gpio_mode=True)
 
 
         # subprocess.run(['cpulimit', '-P', '/usr/bin/gzip', '-l', '10', '-b', '-q'])

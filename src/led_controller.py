@@ -5,6 +5,12 @@ from pyftdi.ftdi import FtdiError
 from pyftdi.usbtools import UsbToolsError
 # from utils import get_most_available_core, set_affinity
 
+import RPi.GPIO as GPIO
+import multiprocessing
+import atexit
+import psutil
+from datetime import datetime
+
 from src.usb_handler import USBHandler
 
 
@@ -12,17 +18,26 @@ class LightController:
     """Class to control the LEDs using the FT232H chip."""
 
 
-    def __init__(self, logger=None, empty=False, keep_final_state=False):
+    def __init__(self, logger=None, empty=False, keep_final_state=False, enable_legacy_gpio_mode=False):
+        """
+        :param logger: The logger instance to use for logging messages.
+        :param empty: A flag to initialize the LightController without any LEDs.
+        :param keep_final_state: A flag to keep the LEDs in their final state after cleanup.
+        :param enable_legacy_gpio_mode: A flag to enable the legacy GPIO mode for controlling the LEDs
+
+        """
         self.logger = logger
         self.device_connected = False
         self.leds = {}
         self.initialized = threading.Event()  # Use an event to signal initialization completion
+        self.spi_controller = None
+        self.leds_lock = threading.Lock()
 
         # Start asynchronous initialization in a separate thread
-        init_thread = threading.Thread(target=self.initialize, args=(empty,keep_final_state,))
+        init_thread = threading.Thread(target=self.initialize, args=(empty,keep_final_state,enable_legacy_gpio_mode,))
         init_thread.start()
 
-    def initialize(self, empty, keep_final_state=False):
+    def initialize(self, empty, keep_final_state=False, enable_legacy_gpio_mode=False):
         try:
             self.spi_controller = FT232H(logger=self.logger)
             self.spi_controller.start_vsync()
@@ -52,6 +67,20 @@ class LightController:
         except (FtdiError, UsbToolsError) as e:
             if self.logger:
                 self.logger.log(f"Initialization error: {e}", log_level=3)
+
+            if self.spi_controller:
+                self.spi_controller.close()
+                self.device_connected = False
+
+            if enable_legacy_gpio_mode:
+                # Fallback to legacy GPIO mode
+                self.logger.log("Falling back to legacy GPIO mode.", log_level=3)
+                self.leds = {
+                    "IR": LEDLegacy(17, logger=self.logger, name='IR', keep_state=keep_final_state),
+                    "Orange": LEDLegacy(18, logger=self.logger, name='Orange', keep_state=keep_final_state),
+                }
+                self.device_connected = True
+
         finally:
             self.initialized.set()  # Signal that initialization is complete
 
@@ -79,19 +108,21 @@ class LightController:
     def close(self):
         close_thread = threading.Thread(target=self.close_func)
         close_thread.start()
+        close_thread.join()
 
     def add_LED(self, name, channel, current='7.5mA', final_state=False):
         """Add a new LED to the LightController."""
-        if name in self.leds:
-            self.logger.log(f"LED with name '{name}' already exists.", log_level=2)
-            return
-        if not self.device_connected:
-            self.logger.log("No USB device connected. Cannot add new LED.", log_level=3)
-            return
+        with self.leds_lock:
+            if name in self.leds:
+                self.logger.log(f"LED with name '{name}' already exists.", log_level=2)
+                return
+            if not self.device_connected:
+                self.logger.log("No USB device connected. Cannot add new LED.", log_level=3)
+                return
 
-        self.leds[name] = LED(usb_handler=self.spi_controller.usb_handler, channel=channel, current=current, name=name,
-                              logger=self.logger, final_state=final_state)
-        self.logger.log(f"Added new LED: {name} on channel {channel} with current {current}.", log_level=5)
+            self.leds[name] = LED(usb_handler=self.spi_controller.usb_handler, channel=channel, current=current, name=name,
+                                  logger=self.logger, final_state=final_state)
+            self.logger.log(f"Added new LED: {name} on channel {channel} with current {current}.", log_level=5)
 
     def test(self):
         """Test the LEDs by turning them on for 2 seconds each."""
@@ -497,8 +528,11 @@ class LED:
             self.logger.log(f"Terminating LED program for {self.name}", log_level=5)
             self.running.clear()
             self.pause_event.set()  # Ensure it doesn't hang on pause
-            self.program.join()  # Ensure the thread has terminated
-            self.logger.log(f"LED program for {self.name} terminated", log_level=5)
+            self.program.join(timeout=2)  # Ensure the thread has terminated
+            if self.program.is_alive():
+                self.logger.log(f"Failed to terminate LED program for {self.name}", log_level=3)
+            else:
+                self.logger.log(f"LED program for {self.name} terminated", log_level=5)
 
         # By default, turn off the LED, but if final_state is True, keep it in the final state
         if self.final_state:
@@ -584,6 +618,52 @@ class LED:
         self.program = threading.Thread(target=led_timer_thread)
         self.program.start()
         self.logger.log(f'Started LED timer thread for {self.name}', log_level=5)
+
+
+
+
+class LEDLegacy(LED):
+
+    def __init__(self, _control_gpio_pin, logger=None, name=None, keep_state=False):
+        super().__init__(None, None, None, logger, name, keep_state)
+        GPIO.setwarnings(False)
+        self.gpio_pin = _control_gpio_pin
+        self.is_on = None
+        self.keep_state = keep_state
+
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setup(self.gpio_pin, GPIO.OUT)
+
+        self.program = None
+
+        self.logger = logger
+        self.name = name
+
+        # Event to control running of the LED process
+        self.running = multiprocessing.Event()
+
+        #self.turn_off()
+
+        # Register a cleanup function to stop the LED timer process on exit
+        # atexit.register(self.cleanup)
+
+    # def __del__(self):
+    #     self.cleanup()
+
+    def turn_on(self):
+        #print(datetime.now(), "LED ON")
+        self.logger.log(f'Turning on {self.name} LED (GPIO {self.gpio_pin})', log_level=5)
+        GPIO.output(self.gpio_pin, GPIO.HIGH)
+        # self.is_on = True
+
+    def turn_off(self):
+        #print(datetime.now(), "LED OFF")
+        self.logger.log(f'Turning off {self.name} LED (GPIO {self.gpio_pin})', log_level=5)
+        GPIO.output(self.gpio_pin, GPIO.LOW)
+        # self.is_on = False
+
+
+
 
 
 class FakeLogger:
