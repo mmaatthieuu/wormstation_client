@@ -56,6 +56,10 @@ if [ "$yes_flag" = false ]; then
     fi
 fi
 
+# Update apt
+echo "Updating apt..."
+sudo apt update
+
 # Function to install a package using apt
 install_package() {
     local package=$1
@@ -212,10 +216,70 @@ else
     fi
 fi
 
-# Modify /etc/dphys-swapfile
-echo "Extending swap size to 2GB..."
-# It should be 3GB but in practice it is limited to 2GB
-sudo sed -i 's/^CONF_SWAPSIZE=.*/CONF_SWAPSIZE=3072/' /etc/dphys-swapfile
+# Disable dphys-swapfile service
+echo "Disabling dphys-swapfile service..."
+sudo systemctl stop dphys-swapfile
+sudo systemctl disable dphys-swapfile
+
+
+# Configure disk-based swap using fallocate
+echo "Configuring disk-based swap (3GB)..."
+
+# Disable existing swap
+sudo swapoff -a
+
+
+# Remove default swapfile if it exists
+if [ -f /var/swap ]; then
+    echo "Removing existing swap file..."
+    sudo rm /var/swap
+fi
+
+# Create a new swapfile using fallocate
+sudo fallocate -l 3G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+
+# Persist the swap configuration in /etc/fstab
+if ! grep -q '/swapfile' /etc/fstab; then
+    echo "/swapfile none swap sw 0 0" | sudo tee -a /etc/fstab
+    echo "Added /swapfile to /etc/fstab."
+else
+    echo "/swapfile already exists in /etc/fstab."
+fi
+
+# Verify the disk-based swap
+echo "Disk-based swap configured:"
+swapon --show
+
+# Configure zram
+echo "Configuring zram..."
+
+# Install zram tools if not already installed
+install_package zram-tools
+
+# Update /etc/default/zram-config
+zram_config="/etc/default/zram-config"
+if [ -f "$zram_config" ]; then
+    sudo sed -i 's/^ZRAM_PERCENTAGE=.*/ZRAM_PERCENTAGE=50/' "$zram_config"
+    sudo sed -i 's/^ZRAM_MAX=.*/ZRAM_MAX=2048/' "$zram_config"
+    echo "Updated zram configuration: 50% RAM with 2048 MB maximum."
+else
+    echo "Creating new zram configuration file..."
+    echo -e "ZRAM_PERCENTAGE=50\nZRAM_MAX=2048" | sudo tee "$zram_config" > /dev/null
+fi
+
+# Restart zram-config service to apply changes
+echo "Restarting zram-config service..."
+sudo systemctl restart zram-config.service
+
+# Verify swap setup
+echo "Verifying final swap setup..."
+swapon --show
+
+echo "Swap configuration complete: ZRAM and 3GB disk-based swap."
+
 
 # Add specific sudo privileges for the current user
 current_user=$(whoami)

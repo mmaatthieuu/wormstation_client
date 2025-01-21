@@ -154,6 +154,7 @@ class UploadManager:
                     self.logger.log("Failed to mount or remote directory is not accessible, skipping upload", log_level=1)
                     return False
 
+            self.logger.log(f"Remote directory is accessible", log_level=5)
             self.upload(output_file, async_upload=False)
 
             # Verify upload success before deleting compressed file
@@ -171,9 +172,11 @@ class UploadManager:
 
         # Upload remaining files
         self.logger.log(f"Uploading remaining files in {folder_name}", log_level=5)
-        # get the folder name from the path of the compressed file
-        rec_folder = os.path.dirname(compressed_file)
-        self.upload_remaining_files(rec_folder)
+        # get the parent parent folder name from the path of the compressed file
+        abs_path = os.path.abspath(folder_name)
+        parent_folder = os.path.dirname(abs_path)
+        self.upload_remaining_files(parent_folder)
+
 
         return True
 
@@ -229,9 +232,12 @@ class UploadManager:
 
 
     def upload_remaining_files(self, rec_folder):
-        self.logger.log("Checking if all files are uploaded", log_level=3)
+        self.logger.log(f"Checking if all files are uploaded in folder {rec_folder}", log_level=3)
 
         # Check if there are some not uploaded files
+        if not rec_folder or not os.path.exists(rec_folder):
+            self.logger.log(f"Invalid or non-existent directory: {rec_folder}", log_level=1)
+            return
 
         # Get list of files in the current directory, excluding directories
         files = [f for f in os.listdir(rec_folder) if os.path.isfile(os.path.join(rec_folder, f))]
