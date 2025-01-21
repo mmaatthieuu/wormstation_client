@@ -1,7 +1,6 @@
 #!/usr/bin/python3 -u
 
 #import picamera
-import argparse
 import os.path
 
 import subprocess
@@ -10,11 +9,9 @@ import signal
 
 from parameters import Parameters
 
-
-from src.cam_lib import *
 from src.record import Recorder
 
-from src.CrashTimeOutException import CrashTimeOutException
+from src.camera.CrashTimeOutException import CrashTimeOutException
 
 
 # TODO make that git check better

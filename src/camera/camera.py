@@ -2,7 +2,6 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from picamera2 import Picamera2
 from picamera2.controls import Controls
-from src.cam_lib import *
 from parameters import Parameters
 
 

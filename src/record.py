@@ -1,4 +1,3 @@
-import time
 import datetime
 from socket import gethostname
 from PIL import Image as im
@@ -16,20 +15,18 @@ from math import log10, ceil
 # from threading import Thread, Lock
 #import multiprocessing
 
-import psutil
 import pathlib
 
-from src.camera import Camera
+from src.camera.camera import Camera
 from src.led_controller import LightController
 # from src.tlc5940.tlc import tlc5940
 import os
 import subprocess
-from subprocess import TimeoutExpired
 from pathlib import Path
 
 #import src.NPImage as npi
 from src.log import Logger
-from src.upload_manager import SMBManager, SSHManager, EmptyUploader
+from src.upload_manager import SMBManager, EmptyUploader
 #from src.analyse import Analyser
 
 '''

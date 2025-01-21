@@ -7,9 +7,6 @@ from pyftdi.usbtools import UsbToolsError
 
 import RPi.GPIO as GPIO
 import multiprocessing
-import atexit
-import psutil
-from datetime import datetime
 
 from src.usb_handler import USBHandler
 
@@ -644,40 +641,22 @@ class LEDLegacy(LED):
     def __init__(self, _control_gpio_pin, logger=None, name=None, keep_state=False):
         super().__init__(None, None, None, logger, name, keep_state)
         GPIO.setwarnings(False)
+
         self.gpio_pin = _control_gpio_pin
-        self.is_on = None
-        self.keep_state = keep_state
 
         GPIO.setmode(GPIO.BCM)
         GPIO.setup(self.gpio_pin, GPIO.OUT)
 
-        self.program = None
 
-        self.logger = logger
-        self.name = name
 
-        # Event to control running of the LED process
-        self.running = multiprocessing.Event()
-
-        #self.turn_off()
-
-        # Register a cleanup function to stop the LED timer process on exit
-        # atexit.register(self.cleanup)
-
-    # def __del__(self):
-    #     self.cleanup()
 
     def turn_on(self):
-        #print(datetime.now(), "LED ON")
         self.logger.log(f'Turning on {self.name} LED (GPIO {self.gpio_pin})', log_level=5)
         GPIO.output(self.gpio_pin, GPIO.HIGH)
-        # self.is_on = True
 
     def turn_off(self):
-        #print(datetime.now(), "LED OFF")
         self.logger.log(f'Turning off {self.name} LED (GPIO {self.gpio_pin})', log_level=5)
         GPIO.output(self.gpio_pin, GPIO.LOW)
-        # self.is_on = False
 
 
 
