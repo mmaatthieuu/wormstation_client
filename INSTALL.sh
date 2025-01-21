@@ -17,7 +17,7 @@ echo "    - opencv-python"
 echo "    - picam (symbolic link to cam.py)"
 echo "    - /etc/.smbpicreds (credential file for smbclient)"
 echo "    - Add current user to 'gpio', 'video' and 'input' groups"
-echo "    - Modify /etc/dphys-swapfile to extend swap size to 2GB"
+echo "    - Extend swap size to 3GB using disk-based swap"
 echo "    - Add specific sudo privileges for the current user"
 echo "    - Create a udev rule for FT232H"
 echo
