@@ -7,7 +7,7 @@ import subprocess
 import sys
 import signal
 
-from parameters import Parameters
+from src.parameters import Parameters
 
 from src.record import Recorder
 
@@ -62,10 +62,9 @@ def main():
 
         # Load parameters
         parameters_file = sys.argv[1]
-        parameters = Parameters(parameters_file)
 
         global recorder
-        recorder = Recorder(parameters=parameters, git_version=get_git_version())
+        recorder = Recorder(parameter_file=parameters_file, git_version=get_git_version())
 
         try:
             recorder.start_recording()
@@ -83,9 +82,9 @@ def main():
     except ValueError as e:
         print(e)
         sys.exit(1)
-    except Exception as e:
-        print(f"Unexpected error: {e}")
-        sys.exit(1)
+    # except Exception as e:
+    #     print(f"Unexpected error: {e}")
+    #     sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -55,6 +55,8 @@ class Logger:
 
             # Write the log message to the appropriate output
             if self.path is None:
+                # If no log file is specified, print to the console
+                # This is useful for debugging
                 print(string, end=end)
             else:
                 with open(self.path, 'a') as log_file:

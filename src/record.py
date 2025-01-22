@@ -17,9 +17,10 @@ from math import log10, ceil
 
 import pathlib
 
-from src.camera.camera import Camera
+from src.camera.camera import Camera, CameraController
 from src.led_controller import LightController
-# from src.tlc5940.tlc import tlc5940
+from src.parameters import Parameters
+
 import os
 import subprocess
 from pathlib import Path
@@ -48,14 +49,15 @@ class Recorder:
     Class Recorder
     """
 
-    def __init__(self, parameters, git_version):
+    def __init__(self, parameter_file, git_version):
         """
         Constructor
         """
         # Get parameter as argument or create new instance that load json ??
-        self.parameters = parameters
+        self.parameter_file = parameter_file
+        self.parameters = Parameters(parameter_file)
 
-        self.logger = Logger(verbosity_level=parameters["verbosity_level"], save_log=self.is_it_useful_to_save_logs())
+        self.logger = Logger(verbosity_level=self.parameters["verbosity_level"], save_log=self.is_it_useful_to_save_logs())
 
         self.logger.log("Initializing recorder", log_level=5)
         self.logger.log("Git version : %s" % git_version, log_level=3)
@@ -65,6 +67,14 @@ class Recorder:
 
         # Log parameters
         self.logger.log(json.dumps(self.parameters, indent=4), log_level=0)
+
+        # Create the camera object with the input parameters
+        # self.camera = Camera(parameters=self.parameters)
+        safe_mode = True
+        if self.preview_only():
+            safe_mode = False
+        self.camera = CameraController(parameters_path=parameter_file, logger=self.logger, safe_mode=safe_mode)
+        self.camera.start()
 
         # Remark : the directory is created on the NAS before initializing the camera
         # If the camera is initialized first, it produces only black frames...
@@ -97,8 +107,7 @@ class Recorder:
 
 
 
-        # Create the camera object with the input parameters
-        self.camera = Camera(parameters=self.parameters)
+
 
         self.current_frame = None
 
@@ -146,6 +155,8 @@ class Recorder:
         # Turn off all LEDs
         #self.lights.turn_off_all_leds()
 
+        self.camera.stop()
+
         self.logger.log("Stopping recording", log_level=3)
 
         self.update_status('Not Running')
@@ -177,14 +188,14 @@ class Recorder:
 
         # Compute the total number of frame from the recording time and time interval between frames
 
-        self.camera.wait_for_init()
+        # self.camera.wait_for_init()
 
-        self.camera.pre_callback = self.annotate_frame
+        # self.camera.pre_callback = self.annotate_frame
 
         #print time before starting the camera since initial time
         #print(f'time before starting the camera since initial time: {time.time() - self.initial_time}')
 
-        self.camera.start()
+        # self.camera.start()
 
         #print(f'time after starting the camera since initial time: {time.time() - self.initial_time}')
 
@@ -267,6 +278,8 @@ class Recorder:
             self.start_time_current_frame = time.time()
             # print(f'frame {self.current_frame_number} start: {self.start_time_current_frame - self.initial_time}')
 
+            capture_ok = False
+
             try:
                 if not self.skip_frame:
                     self.log_progress()
@@ -274,7 +287,11 @@ class Recorder:
                     ## That was randomly crashing so I used the next method
                     # self.camera.capture_file(self.get_last_save_path())
 
-                    self.capture_frame()
+                    # self.capture_frame()
+                    # print(f'Capturing frema to {self.get_last_save_path()}')
+                    capture_ok = self.camera.capture_frame(self.get_last_save_path())
+
+                    # print(f'frame {self.current_frame_number} captured')
 
                     ### From the documentation :
                     '''
@@ -306,14 +323,30 @@ class Recorder:
                     configuration’s buffer_count parameter.
                     '''
                 else:
+                    pass
                     # If frame is skipped, save a black frame to keep continuous numbering
-                    self.save_black_frame(self.get_last_save_path())
+                    # self.save_black_frame(self.get_last_save_path())
+                    # self.camera.capture_empty_frame(self.get_last_save_path())
 
-            except RuntimeError:
+            except RuntimeError as e:
                 # Never occurs actually
-                self.logger.log("Error 2 on frame %d" % self.current_frame_number)
+                # self.logger.log("Error 2 on frame %d" % self.current_frame_number + 1)
+                self.logger.log(f"RuntimeError on frame {self.current_frame_number}: {e}",
+                                log_level=1)
+            except TimeoutError as e:
+                self.logger.log(f"TimeoutError on frame {self.current_frame_number}: {e}",
+                                log_level=1)
 
             finally:
+                if not capture_ok:
+                    self.logger.log(f"Frame {self.current_frame_number} could not be captured. "
+                                    f" Saving as empty frame.",
+                                    log_level=2)
+                    self.camera.capture_empty_frame(self.get_last_save_path())
+                else:
+                    self.logger.log(f"Frame {self.current_frame_number} captured."
+                                    f" ({self.current_frame_number + 1}/{self.n_frames_total})",
+                                    log_level=5)
 
                 # TODO : write doc about why this check is useful
                 if self.get_last_save_path() is not None:
@@ -339,6 +372,7 @@ class Recorder:
         # End of recording
         # Wait for the end of compression
 
+
         # Terminate LED programs
         self.logger.log("Terminating LED programs", log_level=5)
         self.lights.close()
@@ -347,7 +381,7 @@ class Recorder:
 
         self.uploader.upload_remaining_files(self.go_to_tmp_recording_folder())
 
-        self.logger.log("Recording done (Timeout reached)",begin='\n\n', end='\n\n\n',log_level=3)
+        self.logger.log("Recording done (Timeout reached)",begin='\n\n', end='\n\n\n',log_level=0)
         
 
 
@@ -356,18 +390,20 @@ class Recorder:
 
         self.upload_logs()
 
+        # print("Recording done")
+        self.stop()
 
 
 
 
-    def capture_frame(self):
-        # That is the new method, not crashing
-        capture_request = self.camera.capture_request()
-        capture_request.save("main", self.get_last_save_path())
-        capture_request.release()
-
-        # create link to last frame
-        self.create_symlink_to_last_frame()
+    # def capture_frame(self):
+    #     # That is the new method, not crashing
+    #     capture_request = self.camera.capture_request()
+    #     capture_request.save("main", self.get_last_save_path())
+    #     capture_request.release()
+    #
+    #     # create link to last frame
+    #     self.create_symlink_to_last_frame()
 
     def wait_or_catchup_by_skipping_frames(self):
         # Wait
@@ -402,7 +438,7 @@ class Recorder:
         if delay >= self.parameters["time_interval"] and \
                 self.current_frame_number < (self.n_frames_total - 1) and self.pause_mode is False:
             self.skip_frame = True
-            self.logger.log(f"Delay too long : Frame {self.current_frame_number} skipped", begin="\n    WARNING    ")
+            self.logger.log(f"Delay too long : Frame {self.current_frame_number} skipped", log_level=2)
 
     def get_delay(self):
         delay = 0
@@ -419,63 +455,60 @@ class Recorder:
         return delay
 
     def log_progress(self):
-        if self.parameters["verbosity_level"] >= 2:
-            self.logger.log(f"Starting capture of frame {self.current_frame_number + 1}"
-                            f" / {self.n_frames_total}")
-        elif self.parameters["verbosity_level"] == 1:
+        self.logger.log(f"Starting capture of frame {self.current_frame_number}"
+                        f"  ({self.current_frame_number + 1}/{self.n_frames_total})",
+                        log_level=3)
 
-            self.logger.log(f"Starting capture of frame {self.current_frame_number + 1} "
-                            f"/ {self.n_frames_total}", begin="\r", end="")
 
-    def annotate_frame(self, request):
-        if self.parameters["annotate_frames"]:
-            name = self.parameters["recording_name"]
+    # def annotate_frame(self, request):
+    #     if self.parameters["annotate_frames"]:
+    #         name = self.parameters["recording_name"]
+    #
+    #         # Text overlay settings
+    #         colour = (0, 255, 0)
+    #         origin = (0, 40)
+    #         font = cv2.FONT_HERSHEY_SIMPLEX
+    #         scale = 1
+    #         thickness = 2
+    #
+    #         # Generate overlay text
+    #         string_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
+    #         string_to_overlay = f"{gethostname()} | {self.get_filename()} | {string_time} | {name}"
+    #
+    #         try:
+    #             # Access the array data with MappedArray
+    #             with MappedArray(request, "main") as m:
+    #                 # Directly add text using OpenCV
+    #                 cv2.putText(m.array, string_to_overlay, origin, font, scale, colour, thickness)
+    #
+    #         except AttributeError:
+    #             # Fallback if request is already a numpy array (e.g., black frame)
+    #             cv2.putText(request, string_to_overlay, origin, font, scale, colour, thickness)
+    #             return request
 
-            # Text overlay settings
-            colour = (0, 255, 0)
-            origin = (0, 40)
-            font = cv2.FONT_HERSHEY_SIMPLEX
-            scale = 1
-            thickness = 2
+    # def save_frame(self):
+    #     """
+    #     Convert numpy array to image and save it locally
+    #     """
+    #     image = im.fromarray(self.current_frame)
+    #
+    #     save_path = self.get_last_save_path()
+    #     image.save(save_path, quality=self.parameters["quality"])
+    #
+    #     self.write_extended_attributes(save_path=save_path)
 
-            # Generate overlay text
-            string_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
-            string_to_overlay = f"{gethostname()} | {self.get_filename()} | {string_time} | {name}"
-
-            try:
-                # Access the array data with MappedArray
-                with MappedArray(request, "main") as m:
-                    # Directly add text using OpenCV
-                    cv2.putText(m.array, string_to_overlay, origin, font, scale, colour, thickness)
-
-            except AttributeError:
-                # Fallback if request is already a numpy array (e.g., black frame)
-                cv2.putText(request, string_to_overlay, origin, font, scale, colour, thickness)
-                return request
-
-    def save_frame(self):
-        """
-        Convert numpy array to image and save it locally
-        """
-        image = im.fromarray(self.current_frame)
-
-        save_path = self.get_last_save_path()
-        image.save(save_path, quality=self.parameters["quality"])
-
-        self.write_extended_attributes(save_path=save_path)
-
-    def save_black_frame(self, path):
-
-        # Create array with the right size, i.e. sensor resolution. The [::-1] reverse the tuple order, otherwise
-        # the picture is in portrait mode rather than landscape.
-        # The +(3,) is used to append 3 (i.e. the number of RGB channels) to create a RGB image
-
-        import numpy as np
-
-        zero_array = np.zeros((self.camera.camera_properties["PixelArraySize"])[::-1] + (3,), dtype=np.uint8)
-        zero_array = self.annotate_frame(zero_array)
-        image = im.fromarray(zero_array)
-        image.save(path)
+    # def save_black_frame(self, path):
+    #
+    #     # Create array with the right size, i.e. sensor resolution. The [::-1] reverse the tuple order, otherwise
+    #     # the picture is in portrait mode rather than landscape.
+    #     # The +(3,) is used to append 3 (i.e. the number of RGB channels) to create a RGB image
+    #
+    #     import numpy as np
+    #
+    #     zero_array = np.zeros((self.camera.camera_properties["PixelArraySize"])[::-1] + (3,), dtype=np.uint8)
+    #     zero_array = self.annotate_frame(zero_array)
+    #     image = im.fromarray(zero_array)
+    #     image.save(path)
 
     def is_time_for_compression(self):
         """
@@ -508,16 +541,16 @@ class Recorder:
 
         return tmp_folder
 
-    def create_symlink_to_last_frame(self):
-
-        tmp_folder = self.get_tmp_folder()
-
-        # check if tmp folder exists
-        if not os.path.exists(tmp_folder):
-            subprocess.run(['mkdir', '-p', tmp_folder])
-
-        subprocess.run(
-            ['ln', '-sf', '%s' % pathlib.Path(self.get_last_save_path()).absolute(), f'{tmp_folder}/last_frame.jpg'])
+    # def create_symlink_to_last_frame(self):
+    #
+    #     tmp_folder = self.get_tmp_folder()
+    #
+    #     # check if tmp folder exists
+    #     if not os.path.exists(tmp_folder):
+    #         subprocess.run(['mkdir', '-p', tmp_folder])
+    #
+    #     subprocess.run(
+    #         ['ln', '-sf', '%s' % pathlib.Path(self.get_last_save_path()).absolute(), f'{tmp_folder}/last_frame.jpg'])
 
     ### Other utility functions
 
@@ -597,7 +630,7 @@ class Recorder:
             # self.ir_leds.turn_on()
             self.lights["IR"].turn_on()
             time.sleep(0.25)
-            self.capture_frame()
+            self.camera.capture_frame(self.get_last_save_path())
             # self.ir_leds.turn_off()
             self.lights["IR"].turn_off()
             self.logger.log(f"Captured frame {self.current_frame_number} during pause", log_level=3)
@@ -644,7 +677,7 @@ class Recorder:
 
     def get_last_save_path(self):
         try:
-            return os.path.join(self.get_current_dir(), self.get_filename())
+            return os.path.abspath(os.path.join(self.get_current_dir(), self.get_filename()))
         except TypeError:
             return None
 
