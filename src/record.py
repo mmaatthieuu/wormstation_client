@@ -1,34 +1,18 @@
 import datetime
-from socket import gethostname
-from PIL import Image as im
-
-from .utils import *
-
-# import picamera
 import json
-from picamera2 import MappedArray
-import cv2
-
 
 from math import log10, ceil
 
-# from threading import Thread, Lock
-#import multiprocessing
-
-import pathlib
-
-from src.camera.camera import Camera, CameraController
-from src.led_controller import LightController
+from src.camera.camera import CameraController
+from src.led_control.led_controller import LightController
 from src.parameters import Parameters
 
 import os
 import subprocess
-from pathlib import Path
 
-#import src.NPImage as npi
 from src.log import Logger
 from src.upload_manager import SMBManager, EmptyUploader
-#from src.analyse import Analyser
+from src.utils import *
 
 '''
 Verbosity levels:
@@ -131,7 +115,7 @@ class Recorder:
         self.git_version = git_version
 
         # Initialize the LEDs
-        self.lights = LightController(logger=self.logger, enable_legacy_gpio_mode=True)
+        self.lights = LightController(parameters=self.parameters, logger=self.logger, enable_legacy_gpio_mode=True)
 
 
         # TODO pool instead of single process
@@ -163,113 +147,48 @@ class Recorder:
         """
         Main recording function
         """
-        # TODO : save json config
-        # TODO : add git number to json file and maybe add check if git version is the same as current one ?
         # TODO : confirm parameters & check if folder already exists
-        # TODO : check if samba config is working
         # TODO : clean tmp local dir
 
-        # self.lights.test()
-
-        # initialize a timer
-        #self.initial_time = time.time()
 
         # Go to home directory
         self.go_to_tmp_recording_folder()
 
         self.update_status('Recording')
 
-        # Compute the total number of frame from the recording time and time interval between frames
-
-        # self.camera.wait_for_init()
-
-        # self.camera.pre_callback = self.annotate_frame
-
-        #print time before starting the camera since initial time
-        #print(f'time before starting the camera since initial time: {time.time() - self.initial_time}')
-
-        # self.camera.start()
-
-        #print(f'time after starting the camera since initial time: {time.time() - self.initial_time}')
-
-        # Wait for the LEDs to be ready
         self.lights.wait_until_ready()
 
         if not self.preview_only():
             # If one does an actual recording and not just a preview (i.e. timeout=0)
 
-            # Todo check that
-            #print("#DEBUG Starting LED timer with duration %f, period %f, timeout %f" % (self.parameters["illumination_pulse"]/1000,
-            #                                                                      self.parameters["time_interval"],
-            #                                                                      self.parameters["timeout"]))
+            self.lights.start()
 
-            try:
-                self.lights["IR"].run_led_timer(duration=self.parameters["illumination_pulse"] / 1000,
-                                           period=self.parameters["time_interval"],
-                                           timeout=self.parameters["timeout"])
-            except AttributeError:
-                self.logger.log("Illumination board not connected", log_level=3)
 
-            #self.ir_leds.turn_on()
-
-            # wait_time, _ = get_remaining_time_to_next_seconds(time.time(),4)
-            # time.sleep(wait_time)
             wait_until_next_even_second()
 
         else:
             # In case of preview, turn on IR LED to see something
-            # self.ir_leds.turn_on()
             try:
                 self.lights["IR"].turn_on()
             except AttributeError:
-                self.logger.log("Illumination board not connected", log_level=3)
+                self.logger.log("Illumination board not connected", log_level=2)
 
         self.initial_time = time.time()
 
-        if self.optogenetic:
-            try:
-                color = self.parameters["optogenetic_color"]
 
-                self.lights[color].run_led_timer(duration=self.parameters["pulse_duration"],
-                                             period=self.parameters["pulse_interval"],
-                                             timeout=self.parameters["timeout"],
-                                             blinking=True,
-                                             blinking_period=self.parameters["time_interval"])
-
-            except KeyError:
-                self.logger.log("Optogenetic parameters not correctly set", log_level=3)
-
-                self.lights["Orange"].run_led_timer(duration=self.parameters["pulse_duration"],
-                                                 period=self.parameters["pulse_interval"],
-                                                 timeout=self.parameters["timeout"],
-                                                 blinking=True,
-                                                 blinking_period=self.parameters["time_interval"])
-
-            except AttributeError:
-                self.logger.log("Illumination board not connected", log_level=3)
-
-        # self.create_output_folder()
-
-        if self.parameters["use_samba"] and self.is_it_useful_to_save_logs():
-            self.upload_logs()
+        self.upload_logs()
 
         # Main recording loop
         for self.current_frame_number in range(self.parameters["start_frame"], self.n_frames_total):
             self.skip_frame = False
-            # print(f'frame {self.current_frame_number}')
 
             if self.is_it_pause_time(self.current_frame_number):
-                # pause_time = self.parameters["record_every_h"]*60 - self.parameters["record_for_s"]
                 self.pause_recording_in_s(self.pause_time)
-
-            # (Re)Initialize the current frame
-            # self.current_frame = np.empty((3040, 4056, 3), dtype=np.uint8)
 
             # If in advance, wait, otherwise skip frames
             self.wait_or_catchup_by_skipping_frames()
 
             self.start_time_current_frame = time.time()
-            # print(f'frame {self.current_frame_number} start: {self.start_time_current_frame - self.initial_time}')
 
             capture_ok = False
 
@@ -277,53 +196,10 @@ class Recorder:
                 if not self.skip_frame:
                     self.log_progress()
 
-                    ## That was randomly crashing so I used the next method
-                    # self.camera.capture_file(self.get_last_save_path())
-
-                    # self.capture_frame()
-                    # print(f'Capturing frema to {self.get_last_save_path()}')
                     capture_ok = self.camera.capture_frame(self.get_last_save_path())
 
-                    # print(f'frame {self.current_frame_number} captured')
-
-                    ### From the documentation :
-                    '''
-                    https://datasheets.raspberrypi.com/camera/picamera2-manual.pdf
-
-                    Moving processing out of the camera thread
-                    Normally when we use a function like Picamera2.capture_file, 
-                    the processing to capture the image, compress it as (for
-                    example) a JPEG, and save it to file happens in the usual camera 
-                    processing loop. While this happens, the handling of
-                    camera events is blocked and the camera system is likely to drop 
-                    some frames. In many cases this is not terribly
-                    important, but there are occasions when we might prefer all the 
-                    processing to happen somewhere else.
-
-                    Just as an example, if we were recording a video and wanted to capture
-                     a JPEG simultaneously whilst minimising the
-                    risk of dropping any video frames, then it would be beneficial 
-                    to move that processing out of the camera loop.
-
-                    This is easily accomplished simply by capturing a request and calling
-                     request.save as we saw above. Camera events can
-                    still be handled in parallel (though this is somewhat at the mercy of 
-                    Python’s multi-tasking abilities), and the only
-                    downside is that camera system has to make do with one less set of 
-                    buffers until that request is finally released.
-                    However, this can in turn always be mitigated by allocating one or 
-                    more extra sets of buffers via the camera
-                    configuration’s buffer_count parameter.
-                    '''
-                else:
-                    pass
-                    # If frame is skipped, save a black frame to keep continuous numbering
-                    # self.save_black_frame(self.get_last_save_path())
-                    # self.camera.capture_empty_frame(self.get_last_save_path())
-
             except RuntimeError as e:
-                # Never occurs actually
-                # self.logger.log("Error 2 on frame %d" % self.current_frame_number + 1)
+
                 self.logger.log(f"RuntimeError on frame {self.current_frame_number}: {e}",
                                 log_level=1)
             except TimeoutError as e:
@@ -343,10 +219,6 @@ class Recorder:
 
                 # TODO : write doc about why this check is useful
                 if self.get_last_save_path() is not None:
-                    # new process for saving
-                    # self.save_process = multiprocessing.Process(target=self.save_frame)
-                    # self.save_process.start()
-                    # self.save_frame()
 
                     if self.is_time_for_compression():
                         # self.logger.log("time for compression")
@@ -354,9 +226,8 @@ class Recorder:
                         self.uploader.start_async_compression_and_upload(dir_to_compress=self.get_current_dir(),
                                                                          format="mkv")
 
-                        if self.parameters["use_samba"] and self.is_it_useful_to_save_logs():
-                            # This is overwhelming for pour NAS CPU if done too often
-                            self.upload_logs()
+
+                        self.upload_logs()
 
 
 
@@ -388,15 +259,6 @@ class Recorder:
 
 
 
-
-    # def capture_frame(self):
-    #     # That is the new method, not crashing
-    #     capture_request = self.camera.capture_request()
-    #     capture_request.save("main", self.get_last_save_path())
-    #     capture_request.release()
-    #
-    #     # create link to last frame
-    #     self.create_symlink_to_last_frame()
 
     def wait_or_catchup_by_skipping_frames(self):
         # Wait
@@ -453,56 +315,6 @@ class Recorder:
                         log_level=3)
 
 
-    # def annotate_frame(self, request):
-    #     if self.parameters["annotate_frames"]:
-    #         name = self.parameters["recording_name"]
-    #
-    #         # Text overlay settings
-    #         colour = (0, 255, 0)
-    #         origin = (0, 40)
-    #         font = cv2.FONT_HERSHEY_SIMPLEX
-    #         scale = 1
-    #         thickness = 2
-    #
-    #         # Generate overlay text
-    #         string_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
-    #         string_to_overlay = f"{gethostname()} | {self.get_filename()} | {string_time} | {name}"
-    #
-    #         try:
-    #             # Access the array data with MappedArray
-    #             with MappedArray(request, "main") as m:
-    #                 # Directly add text using OpenCV
-    #                 cv2.putText(m.array, string_to_overlay, origin, font, scale, colour, thickness)
-    #
-    #         except AttributeError:
-    #             # Fallback if request is already a numpy array (e.g., black frame)
-    #             cv2.putText(request, string_to_overlay, origin, font, scale, colour, thickness)
-    #             return request
-
-    # def save_frame(self):
-    #     """
-    #     Convert numpy array to image and save it locally
-    #     """
-    #     image = im.fromarray(self.current_frame)
-    #
-    #     save_path = self.get_last_save_path()
-    #     image.save(save_path, quality=self.parameters["quality"])
-    #
-    #     self.write_extended_attributes(save_path=save_path)
-
-    # def save_black_frame(self, path):
-    #
-    #     # Create array with the right size, i.e. sensor resolution. The [::-1] reverse the tuple order, otherwise
-    #     # the picture is in portrait mode rather than landscape.
-    #     # The +(3,) is used to append 3 (i.e. the number of RGB channels) to create a RGB image
-    #
-    #     import numpy as np
-    #
-    #     zero_array = np.zeros((self.camera.camera_properties["PixelArraySize"])[::-1] + (3,), dtype=np.uint8)
-    #     zero_array = self.annotate_frame(zero_array)
-    #     image = im.fromarray(zero_array)
-    #     image.save(path)
-
     def is_time_for_compression(self):
         """
         Check if it is time to compress (step number is reached or end of recording and return a bool
@@ -520,8 +332,6 @@ class Recorder:
 
 
 
-
-
     def delete_local_files(self, folder_name):
         subprocess.run(['rm', '-rf', '%s' % folder_name])
         subprocess.run(['rm', '-rf', '%s.tgz' % folder_name])
@@ -534,36 +344,24 @@ class Recorder:
 
         return tmp_folder
 
-    # def create_symlink_to_last_frame(self):
-    #
-    #     tmp_folder = self.get_tmp_folder()
-    #
-    #     # check if tmp folder exists
-    #     if not os.path.exists(tmp_folder):
-    #         subprocess.run(['mkdir', '-p', tmp_folder])
-    #
-    #     subprocess.run(
-    #         ['ln', '-sf', '%s' % pathlib.Path(self.get_last_save_path()).absolute(), f'{tmp_folder}/last_frame.jpg'])
 
     ### Other utility functions
 
     def go_to_tmp_recording_folder(self):
-        os.chdir(Path.home())
+        tmp_rec_folder = self.get_tmp_recording_folder()
 
         # Created directory to save locally the files before upload
         try:
-            os.mkdir(self.parameters["local_tmp_dir"])
+            os.makedirs(tmp_rec_folder)
         except FileExistsError:
-            # os.remove(self.parameters["local_tmp_dir"])
-            # os.mkdir(self.parameters["local_tmp_dir"])
             pass
 
-        os.chdir(self.parameters["local_tmp_dir"])
+        os.chdir(tmp_rec_folder)
         return os.getcwd()
 
     def get_tmp_recording_folder(self):
         # get home path
-        home = str(Path.home())
+        home = os.path.expanduser("~")
         return f'{home}/{self.parameters["local_tmp_dir"]}'
 
     def get_pause_mode(self):
@@ -642,26 +440,22 @@ class Recorder:
 
                 n_frames = int(
                     self.parameters["record_for_s"] / self.parameters["time_interval"]) * numer_of_acquisitions
-                #print(f'number of frames : {n_frames}')
                 if n_frames == 0:
                     n_frames = 1
         except ZeroDivisionError:
             n_frames = 1
         finally:
-            #print(f'number of frames : {n_frames}')
             return n_frames
 
     def read_output_filename(self):
         f = self.parameters["output_filename"]
-        #print("entered read_output_filename")
         if f == "auto":
             return self.get_needed_output_format()
         else:
             return f
 
     def get_needed_output_format(self):
-        #print("entered get_needed_output_format")
-        #print(self.n_frames_total)
+
         digits = int(ceil(log10(self.n_frames_total)))
         #print(digits)
         if digits == 0:
@@ -682,14 +476,6 @@ class Recorder:
             filename = self.output_filename
         return filename
 
-    def write_extended_attributes(self, save_path):
-        os.setxattr(save_path, 'user.datetime', (str(datetime.now())).encode('utf-8'))
-        os.setxattr(save_path, 'user.index', ("%06d" % self.current_frame_number).encode('utf-8'))
-        os.setxattr(save_path, 'user.hostname', (os.uname()[1]).encode('utf-8'))
-        os.setxattr(save_path, 'user.jpg_quality', ("%02d" % self.parameters["quality"]).encode('utf-8'))
-        os.setxattr(save_path, 'user.averaged', ("%d" % self.parameters["average"]).encode('utf-8'))
-        os.setxattr(save_path, 'user.git_version', self.git_version.encode('utf-8'))
-        os.setxattr(save_path, 'user.skipped', ("%d" % int(self.skip_frame)).encode('utf-8'))
 
     def get_current_dir(self):
 
@@ -722,11 +508,12 @@ class Recorder:
         return False
 
     def upload_logs(self):
-        try:
-            self.uploader.upload(file_to_upload=self.logger.get_log_file_path(),
-                             filename_at_destination=self.logger.get_log_filename())
-        except TypeError:
-            pass
+        if self.parameters["use_samba"] and self.is_it_useful_to_save_logs():
+            try:
+                self.uploader.upload(file_to_upload=self.logger.get_log_file_path(),
+                                 filename_at_destination=self.logger.get_log_filename())
+            except TypeError:
+                pass
 
 
 

@@ -1,6 +1,5 @@
 #!/usr/bin/python3 -u
 
-#import picamera
 import os.path
 
 import subprocess
@@ -10,9 +9,6 @@ import signal
 from src.parameters import Parameters
 
 from src.record import Recorder
-
-from src.camera.CrashTimeOutException import CrashTimeOutException
-
 
 # TODO make that git check better
 git_check = subprocess.run(['git', '--git-dir=/home/matthieu/piworm/.git', 'rev-list',
@@ -71,8 +67,6 @@ def main():
         except KeyboardInterrupt:
             recorder.logger.log("Keyboard interrupt. Stopping recording.")
             print("Keyboard interrupt. Stopping recording.")
-        except CrashTimeOutException:
-            print("#DEBUG Crash time out exception")
         finally:
             del recorder
 
