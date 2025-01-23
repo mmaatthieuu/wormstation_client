@@ -62,8 +62,7 @@ class Recorder:
         self.logger.log("Initializing recorder", log_level=5)
         self.logger.log("Git version : %s" % git_version, log_level=3)
 
-        tmp_folder = self.get_tmp_folder() # Path to the temporary folder
-        self.status_file_path = f'{tmp_folder}/status.txt' # Path to the status file
+        self.status_file_path = f'{self.get_tmp_folder()}/status.txt' # Path to the status file
 
         # Log parameters
         self.logger.log(json.dumps(self.parameters, indent=4), log_level=0)
@@ -108,15 +107,11 @@ class Recorder:
 
 
 
-
-        self.current_frame = None
-
         self.pause_mode = self.get_pause_mode()
         self.pause_number = 0
         self.pause_time = self.parameters["record_every_h"] * 3600 - self.parameters["record_for_s"]
 
         self.current_frame_number = 0
-        self.number_of_skipped_frames = 0
         self.n_frames_total = self.compute_total_number_of_frames()
 
         self.compress_step = self.parameters["compress"]
@@ -138,8 +133,6 @@ class Recorder:
         # Initialize the LEDs
         self.lights = LightController(logger=self.logger, enable_legacy_gpio_mode=True)
 
-
-        # subprocess.run(['cpulimit', '-P', '/usr/bin/gzip', '-l', '10', '-b', '-q'])
 
         # TODO pool instead of single process
         self.compress_process = None
