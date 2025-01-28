@@ -313,7 +313,7 @@ class CameraController:
                 self.capture_empty_frame(save_path)
                 raise RuntimeError("The previous request is still running.")
 
-            ok = self.send_command(f"capture {save_path}", timeout=2)
+            ok = self.send_command(f"capture {save_path}", timeout=5)
             # print(f"[Main Script] Frame successfully saved to {save_path}")
             return ok
         except Exception:
