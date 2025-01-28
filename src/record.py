@@ -142,10 +142,6 @@ class Recorder:
         self.lights = LightController(parameters=self.parameters, logger=self.logger, enable_legacy_gpio_mode=True)
 
 
-        # TODO pool instead of single process
-        self.compress_process = None
-        self.save_process = None
-
         self.logger.log("Recorder initialized", log_level=5)
 
     def __del__(self):

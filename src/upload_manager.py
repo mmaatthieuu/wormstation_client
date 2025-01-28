@@ -7,9 +7,10 @@ import psutil
 
 import random
 
-from multiprocessing import Process
+from multiprocessing import Process, Pool
 from datetime import datetime
 from socket import gethostname
+from concurrent.futures import ProcessPoolExecutor
 
 
 class UploadManager:
@@ -21,7 +22,10 @@ class UploadManager:
         self.local_dir = local_dir if local_dir else f"/home/{self.username}/Remote"
         self.full_path = os.path.join(self.local_dir, self.remote_dir)
 
-        self.compress_process = None
+        # self.compress_process = None
+        self.compress_pool = Pool(processes=1)
+
+
 
 
     def get_user_info(self):
@@ -35,9 +39,26 @@ class UploadManager:
         os.makedirs(self.full_path, exist_ok=True)
 
     def file_exists(self, filename):
-        # Check if a file exists in the local mount point
-        file_path = os.path.join(self.full_path, filename)
-        return os.path.exists(file_path)
+        """
+        Check if a file exists in the local mount point.
+        Handles potential errors gracefully.
+        """
+        if not self.is_mounted():
+            self.logger.log(f"Cannot check file existence: {self.full_path} is not mounted", log_level=1)
+            return False
+
+        if not filename:
+            self.logger.log("Filename is invalid or empty", log_level=1)
+            return False
+
+        try:
+            file_path = os.path.join(self.full_path, filename)
+            exists = os.path.exists(file_path)
+            self.logger.log(f"File existence check for {file_path}: {exists}", log_level=3)
+            return exists
+        except Exception as e:
+            self.logger.log(f"Error checking file existence for {filename}: {e}", log_level=1)
+            return False
 
     def upload(self, file_to_upload, filename_at_destination="", async_upload=True):
         if async_upload:
@@ -106,23 +127,37 @@ class UploadManager:
             return False
 
     def start_async_compression_and_upload(self, dir_to_compress, format):
+        """
+        Submit a compression task to the pool.
+        """
+        self.logger.log(f"Queueing compression for {dir_to_compress} with format {format}", log_level=3)
+        self.compress_pool.apply_async(self.compress_analyze_and_upload, args=(dir_to_compress, format))
 
-        if self.compress_process and self.compress_process.is_alive():
-            self.logger.log("Compression already in progress, waiting for the previous compression to end", log_level=3)
-            self.compress_process.join() # Wait for the previous compression to end
 
-        self.logger.log(f'Compressing and uploading {dir_to_compress}, with format {format}', log_level=3)
-        # log("Dest path : %s " % output_folder)
-        # self.save_process.join()
-        self.compress_process = Process(target=self.compress_analyze_and_upload,
-                                        args=(dir_to_compress, format,))
-        self.compress_process.start()
+        # if self.compress_process and self.compress_process.is_alive():
+        #     self.logger.log("Compression already in progress, waiting for the previous compression to end", log_level=3)
+        #     # self.compress_process.join() # Wait for the previous compression to end
+        #
+        # self.logger.log(f'Compressing and uploading {dir_to_compress}, with format {format}', log_level=3)
+        # # log("Dest path : %s " % output_folder)
+        # # self.save_process.join()
+        # self.compress_process = Process(target=self.compress_analyze_and_upload,
+        #                                 args=(dir_to_compress, format,))
+        # self.compress_process.start()
 
-    def is_compressing(self):
-        return self.compress_process.is_alive()
+
+    # def is_compressing(self):
+    #     return self.compress_process.is_alive()
 
     def wait_for_compression(self):
-        self.compress_process.join()
+        """
+        Waits for all tasks in the compression pool to complete.
+        """
+        self.logger.log("Waiting for all compression tasks to complete...", log_level=3)
+        self.compress_pool.close()  # Stop accepting new tasks
+        self.compress_pool.join()  # Wait for all submitted tasks to finish
+        self.logger.log("All compression tasks completed.", log_level=3)
+        # self.compress_process.join()
 
     def compress_analyze_and_upload(self, folder_name, format, analyze=False):
         compressed_file = self.compress(folder_name=folder_name, format=format)
@@ -200,7 +235,7 @@ class UploadManager:
 
         return True
 
-    def compress(self, folder_name, format="tgz"):
+    def compress(self, folder_name, format="tgz", timeout=2700):    # timeout after 45 minutes
 
         self.logger.log(f'Compressing {folder_name} to {format}', log_level=5)
 
@@ -223,10 +258,15 @@ class UploadManager:
         args_string = ' '.join(call_args)
         self.logger.log(f'Running command : {args_string}', log_level=5)
 
-
-        subprocess.run(call_args, stdout=subprocess.DEVNULL)
-
-        self.logger.log("Compression of %s done" % folder_name, begin="\n")
+        try:
+            subprocess.run(call_args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=timeout)
+            self.logger.log(f"Compression of {folder_name} done", begin="\n")
+        except subprocess.TimeoutExpired:
+            self.logger.log(f"Compression process for {folder_name} timed out after {timeout} seconds", log_level=1)
+            return None  # Return None to indicate failure
+        except subprocess.CalledProcessError as e:
+            self.logger.log(f"Compression failed for {folder_name}. Error: {e}", log_level=1)
+            return None  # Return None to indicate failure
 
         return output_file
 
@@ -326,6 +366,9 @@ class SMBManager(UploadManager):
         self.credentials_file = credentials_file
 
     def mount(self):
+        """
+        Mount the NAS share to the local directory. Adds a timeout to handle long-running commands.
+        """
         # Create local mount point if it does not exist
         if not os.path.exists(self.local_dir):
             os.makedirs(self.local_dir)
@@ -341,13 +384,21 @@ class SMBManager(UploadManager):
             "-o", f"credentials={self.credentials_file},uid={self.uid},gid={self.gid},file_mode=0660,dir_mode=0770",
             f"{self.remote_server}/{self.share_name}", self.local_dir
         ]
-        result = subprocess.run(mount_cmd, capture_output=True)
-        if result.returncode != 0:
-            self.logger.log(f"Failed to mount NAS: {result.stderr.decode()}", log_level=1)
-            return False
 
-        print(f"Mounted {self.remote_server}/{self.share_name} to {self.local_dir}")
-        return True
+        try:
+            result = subprocess.run(mount_cmd, capture_output=True, timeout=30)  # Timeout set to 30 seconds
+            if result.returncode != 0:
+                self.logger.log(f"Failed to mount NAS: {result.stderr.decode()}", log_level=1)
+                return False
+
+            self.logger.log(f"Mounted {self.remote_server}/{self.share_name} to {self.local_dir}", log_level=3)
+            return True
+        except subprocess.TimeoutExpired:
+            self.logger.log(f"Mount operation timed out after 30 seconds", log_level=1)
+            return False
+        except Exception as e:
+            self.logger.log(f"Unexpected error during mount operation: {e}", log_level=1)
+            return False
 
     def unmount(self):
         # Unmount the NAS share
@@ -357,16 +408,40 @@ class SMBManager(UploadManager):
             print(f"Unmounted {self.local_dir}")
 
     def is_mounted(self):
-        # Check if the NAS is mounted
-        result = subprocess.run(['mountpoint', '-q', self.local_dir])
-        return result.returncode == 0
+        """
+        Check if the NAS is mounted by verifying if self.local_dir is a mount point.
+        Handles subprocess timeout gracefully.
+        """
+        try:
+            result = subprocess.run(['mountpoint', '-q', self.local_dir], timeout=10, check=False)
+            return result.returncode == 0
+        except subprocess.TimeoutExpired:
+            self.logger.log(f"Timeout expired while checking mount status of {self.local_dir}", log_level=1)
+            return False  # Treat it as not mounted if the check times out
+        except subprocess.CalledProcessError as e:
+            self.logger.log(f"Error checking mount status: {e}", log_level=1)
+            return False
+        except Exception as e:
+            self.logger.log(f"Unexpected error: {e}", log_level=1)
+            return False
 
     def is_accessible(self):
-        # Check if the NAS server is accessible by pinging it
+        """
+        Check if the NAS server is accessible by pinging it.
+        Handles timeout and unexpected errors gracefully.
+        """
         nas_host = self.remote_server.lstrip("//").split("/")[0]
         ping_cmd = ["ping", "-c", "1", nas_host]
-        result = subprocess.run(ping_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        return result.returncode == 0
+
+        try:
+            result = subprocess.run(ping_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5)
+            return result.returncode == 0
+        except subprocess.TimeoutExpired:
+            self.logger.log(f"Ping to {nas_host} timed out after 5 seconds", log_level=1)
+            return False
+        except Exception as e:
+            self.logger.log(f"Error checking accessibility of {nas_host}: {e}", log_level=1)
+            return False
 
     def get_tree_structure(self, remote_dir, recording_name):
         #self.logger.log(f"Creating tree structure with SMB protocol", log_level=5)
