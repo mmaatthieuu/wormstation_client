@@ -3,6 +3,7 @@ import re
 import os
 from datetime import datetime, timedelta
 import sys
+import time
 
 from dotenv import load_dotenv
 from email_manager import EmailClient, IgnoredFoldersManager
@@ -177,6 +178,31 @@ class WormstationMonitor:
             # Check all devices in this recording
             self.check_devices_in_recording(recording_path, start_time)
 
+        self.print_results()
+
+        # Recheck flagged recordings
+        if self.recordings_to_recheck_later:
+            print(f"\nWaiting for {recheck_delay} minutes before rechecking...")
+            time.sleep(recheck_delay)  # Wait 15 minutes
+            print("\nRechecking flagged recordings:")
+            self.clear_results()
+            for device_path, start_time in list(self.recordings_to_recheck_later):
+                self.check_device_logs_and_videos(device_path, start_time, force_alert=True)
+                self.recordings_to_recheck_later.remove((device_path, start_time))  # Remove after rechecking
+
+            self.print_results()
+
+    def clear_results(self):
+        """
+        Clears the results lists.
+        """
+        self.skipped_folders.clear()
+        self.terminated_recordings.clear()
+        self.recordings_ok.clear()
+        self.recordings_not_ok.clear()
+        self.recordings_potentially_not_ok.clear()
+
+    def print_results(self):
         # Print summary of results
         print("\nSummary:")
         print(f"  Skipped folders: {len(self.skipped_folders)}")
@@ -185,14 +211,25 @@ class WormstationMonitor:
         print(f"  Recordings not OK: {len(self.recordings_not_ok)}")
         print(f"  Recordings potentially not OK: {len(self.recordings_potentially_not_ok)}")
 
-        # Recheck flagged recordings
-        if self.recordings_to_recheck_later:
-            print(f"\nWaiting for {recheck_delay} minutes before rechecking...")
-            time.sleep(recheck_delay)  # Wait 15 minutes
-            print("\nRechecking flagged recordings:")
-            for device_path, start_time in list(self.recordings_to_recheck_later):
-                self.check_device_logs_and_videos(device_path, start_time, force_alert=True)
-                self.recordings_to_recheck_later.remove((device_path, start_time))  # Remove after rechecking
+        print("\n\nDetails:")
+        print(f"  Skipped folders:")
+        for folder in self.skipped_folders:
+            print(f"    {folder}")
+        print(f"  Terminated recordings:")
+        for folder, start_time in self.terminated_recordings:
+            print(f"    {folder} (started at {start_time})")
+        print(f"  Recordings not OK:")
+        for folder, actual, expected in self.recordings_not_ok:
+            print(f"    {folder} has {actual} video files but {expected} were expected.")
+        print(f"  Recordings potentially not OK:")
+        for folder, actual, expected in self.recordings_potentially_not_ok:
+            print(
+                f"    {folder} has {actual} video files but {expected} were expected. Video compression may be ongoing.")
+        print(f"  Recordings OK:")
+        for folder, actual, expected in self.recordings_ok:
+            print(f"    {folder} has the expected number of video files.")
+
+        print("\n\n")
 
 
     def check_devices_in_recording(self, recording_path, start_time):
