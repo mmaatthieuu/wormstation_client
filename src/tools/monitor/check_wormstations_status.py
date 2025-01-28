@@ -40,6 +40,8 @@ class WormstationMonitor:
         self.email_client = email_client
         self.ignored_manager = ignored_manager
 
+        self.recordings_to_recheck_later = []
+
     @staticmethod
     def extract_json_from_log(file_path):
         """
@@ -131,7 +133,7 @@ class WormstationMonitor:
             # Normalize each path to ensure consistent comparison
             return {os.path.abspath(line.strip()) for line in f if line.strip()}
 
-    def check_recordings(self):
+    def check_recordings(self, recheck_delay=900):
         """
         Main function to check all recordings in the specified path.
 
@@ -166,6 +168,16 @@ class WormstationMonitor:
             # Check all devices in this recording
             self.check_devices_in_recording(recording_path, start_time)
 
+        # Recheck flagged recordings
+        if self.recordings_to_recheck_later:
+            print(f"\nWaiting for {recheck_delay} minutes before rechecking...")
+            time.sleep(recheck_delay)  # Wait 15 minutes
+            print("\nRechecking flagged recordings:")
+            for device_path, start_time in list(self.recordings_to_recheck_later):
+                self.check_device_logs_and_videos(device_path, start_time, force_alert=True)
+                self.recordings_to_recheck_later.remove((device_path, start_time))  # Remove after rechecking
+
+
     def check_devices_in_recording(self, recording_path, start_time):
         """
         Checks all devices within a specific recording folder.
@@ -190,13 +202,14 @@ class WormstationMonitor:
 
             self.check_device_logs_and_videos(device_path, start_time)
 
-    def check_device_logs_and_videos(self, device_path, start_time):
+    def check_device_logs_and_videos(self, device_path, start_time, force_alert=False):
         """
         Validates log files and video files for a specific device.
 
         :param device_path: Path to the device folder.
         :param start_time: Start time of the recording as a datetime object.
         """
+
         # Find all log files in the device folder
         log_files = [
             os.path.join(device_path, f) for f in os.listdir(device_path) if f.endswith(self.log_file_extension)
@@ -223,14 +236,16 @@ class WormstationMonitor:
             # Calculate the expected number of video files
             expected_videos = self.how_many_video_files_to_expect(parameters, elapsed_time)
 
-            # Compare actual vs. expected number of video files
-            self.compare_video_count(device_path, len(video_files), expected_videos)
+            if not self.compare_video_count(device_path, len(video_files), expected_videos, force_alert):
+                if not force_alert:
+                    self.recordings_to_recheck_later.add((device_path, start_time))
 
-    def compare_video_count(self, device_path, actual, expected):
+
+    def compare_video_count(self, device_path, actual, expected, force_alert=False):
         """
         Compares the actual and expected number of video files and prints a status message.
         """
-        if actual < expected - 1:
+        if actual < expected - 1 or force_alert:
             print(f"  {device_path} has {actual} video files but {expected} were expected.")
             self.email_client.send_email_to_all(
                 subject="Wormstation Recording Alert",
@@ -240,11 +255,14 @@ class WormstationMonitor:
                      f"If you want to ignore future warnings for this folder, reply to this email with the text:\n"
                      f"IGNORE:{device_path}"
             )
+            return True
         elif actual < expected:
             print(
                 f"  {device_path} has {actual} video files but {expected} were expected. Video compression may be ongoing.")
+            return False
         else:
             print(f"  {device_path} has the expected number of video files.")
+            return True
 
 
 if __name__ == "__main__":
