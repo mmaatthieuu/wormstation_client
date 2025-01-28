@@ -214,7 +214,7 @@ class WormstationMonitor:
             # Check logs and videos for each device
 
             if device_path in excluded_folders:
-                print(f"Skipping ignored folder: {device_path}")
+                # print(f"Skipping ignored folder: {device_path}")
                 self.skipped_folders.append(device_path)
                 continue
 
@@ -265,7 +265,7 @@ class WormstationMonitor:
         Compares the actual and expected number of video files and prints a status message.
         """
         if actual < expected - 1 or force_alert:
-            print(f"  {device_path} has {actual} video files but {expected} were expected.")
+            # print(f"  {device_path} has {actual} video files but {expected} were expected.")
             self.email_client.send_email_to_all(
                 subject="Wormstation Recording Alert",
                 body=f"Discrepancy detected in {device_path}.\n"
@@ -277,12 +277,12 @@ class WormstationMonitor:
             self.recordings_not_ok.append((device_path, actual, expected))
             return True
         elif actual < expected:
-            print(
-                f"  {device_path} has {actual} video files but {expected} were expected. Video compression may be ongoing.")
+            # print(
+                # f"  {device_path} has {actual} video files but {expected} were expected. Video compression may be ongoing.")
             self.recordings_potentially_not_ok.append((device_path, actual, expected))
             return False
         else:
-            print(f"  {device_path} has the expected number of video files.")
+            # print(f"  {device_path} has the expected number of video files.")
             self.recordings_ok.append((device_path, actual, expected))
             return True
 
