@@ -127,11 +127,21 @@ class UploadManager:
             return False
 
     def start_async_compression_and_upload(self, dir_to_compress, format):
-        """
-        Submit a compression task to the pool.
-        """
+        if not hasattr(self, 'compress_pool') or self.compress_pool is None:
+            self.logger.log("Compression pool is not initialized!", log_level=1)
+            return
         self.logger.log(f"Queueing compression for {dir_to_compress} with format {format}", log_level=3)
-        self.compress_pool.apply_async(self.compress_analyze_and_upload, args=(dir_to_compress, format))
+        self.compress_pool.apply_async(
+            self.compress_analyze_and_upload,
+            args=(dir_to_compress, format),
+            callback=self.task_success,
+            error_callback=self.task_failure
+        )
+    def task_success(self, result):
+        self.logger.log(f"Task completed successfully: {result}", log_level=3)
+
+    def task_failure(self, error):
+        self.logger.log(f"Task failed with error: {error}", log_level=1)
 
 
         # if self.compress_process and self.compress_process.is_alive():
