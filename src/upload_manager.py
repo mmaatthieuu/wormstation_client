@@ -7,7 +7,7 @@ import psutil
 
 import random
 
-from multiprocessing import Process, Queue
+from multiprocessing import Process
 from datetime import datetime
 from socket import gethostname
 from concurrent.futures import ProcessPoolExecutor
@@ -22,12 +22,12 @@ class UploadManager:
         self.local_dir = local_dir if local_dir else f"/home/{self.username}/Remote"
         self.full_path = os.path.join(self.local_dir, self.remote_dir)
 
-        self.task_queue = Queue()
+        # self.task_queue = Queue()
         self.compress_process = None
 
         # Start the process manager
-        self.manager_process = Process(target=self._process_queue)
-        self.manager_process.start()
+        # self.manager_process = Process(target=self._process_queue)
+        # self.manager_process.start()
 
 
 
@@ -130,26 +130,26 @@ class UploadManager:
             self.logger.log(f"Failed to upload {file}", log_level=1)
             return False
 
-    def _process_queue(self):
-        """
-        Processes tasks in the queue sequentially using a separate compression process.
-        """
-        while True:
-            dir_to_compress, format = self.task_queue.get()  # Get the next task
-            self.logger.log(f"Starting compression for {dir_to_compress} with format {format}", log_level=3)
-
-            # Create a separate process for the compression task
-            self.compress_process = Process(target=self.compress_analyze_and_upload, args=(dir_to_compress, format))
-            self.compress_process.start()
-
-            # Wait for the compression process to complete
-            self.compress_process.join()
-            self.logger.log(f"Compression and upload for {dir_to_compress} completed.", log_level=3)
-
-            # Mark the task as done
-            # self.task_queue.task_done()
-
-            time.sleep(10)
+    # def _process_queue(self):
+    #     """
+    #     Processes tasks in the queue sequentially using a separate compression process.
+    #     """
+    #     while True:
+    #         dir_to_compress, format = self.task_queue.get()  # Get the next task
+    #         self.logger.log(f"Starting compression for {dir_to_compress} with format {format}", log_level=3)
+    #
+    #         # Create a separate process for the compression task
+    #         self.compress_process = Process(target=self.compress_analyze_and_upload, args=(dir_to_compress, format))
+    #         self.compress_process.start()
+    #
+    #         # Wait for the compression process to complete
+    #         self.compress_process.join()
+    #         self.logger.log(f"Compression and upload for {dir_to_compress} completed.", log_level=3)
+    #
+    #         # Mark the task as done
+    #         # self.task_queue.task_done()
+    #
+    #         time.sleep(10)
 
     def start_async_compression_and_upload(self, dir_to_compress, format):
         # if not hasattr(self, 'compress_pool') or self.compress_pool is None:
@@ -163,20 +163,20 @@ class UploadManager:
         #     error_callback=self.task_failure
         # )
 
-        self.logger.log(f"Queueing compression and upload for {dir_to_compress} with format {format}", log_level=3)
-        self.task_queue.put((dir_to_compress, format))
+        # self.logger.log(f"Queueing compression and upload for {dir_to_compress} with format {format}", log_level=3)
+        # self.task_queue.put((dir_to_compress, format))
 
 
         # if self.compress_process and self.compress_process.is_alive():
         #     self.logger.log("Compression already in progress, waiting for the previous compression to end", log_level=3)
-        #     # self.compress_process.join() # Wait for the previous compression to end
-        #
-        # self.logger.log(f'Compressing and uploading {dir_to_compress}, with format {format}', log_level=3)
-        # # log("Dest path : %s " % output_folder)
-        # # self.save_process.join()
-        # self.compress_process = Process(target=self.compress_analyze_and_upload,
-        #                                 args=(dir_to_compress, format,))
-        # self.compress_process.start()
+            # self.compress_process.join() # Wait for the previous compression to end
+
+        self.logger.log(f'Compressing and uploading {dir_to_compress}, with format {format}', log_level=3)
+        # log("Dest path : %s " % output_folder)
+        # self.save_process.join()
+        self.compress_process = Process(target=self.compress_analyze_and_upload,
+                                        args=(dir_to_compress, format,))
+        self.compress_process.start()
 
     def task_success(self, result):
         self.logger.log(f"Task completed successfully: {result}", log_level=3)
@@ -194,18 +194,7 @@ class UploadManager:
         """
         Waits for all tasks in the queue to be processed.
         """
-        self.logger.log("Waiting for all compression tasks to complete...", log_level=3)
-
-        while not self.task_queue.empty() or (self.compress_process and self.compress_process.is_alive()):
-            # Log the current status
-            self.logger.log("Still processing tasks...", log_level=3)
-            time.sleep(10)  # Add a small delay to avoid busy-waiting
-
-        # Ensure the last process finishes if it's still running
-        if self.compress_process:
-            self.compress_process.join()
-
-        self.logger.log("All compression tasks completed.", log_level=3)
+        self.compress_process.join()
 
     def compress_analyze_and_upload(self, folder_name, format, analyze=False):
         compressed_file = self.compress(folder_name=folder_name, format=format)
