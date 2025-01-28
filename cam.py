@@ -22,7 +22,6 @@ from src.record import Recorder
 
 import os
 import subprocess
-import time
 
 
 def get_git_version() -> str:
@@ -121,8 +120,6 @@ def main():
             print("Error: You must provide a JSON file containing parameters.")
             print("Usage: python3 cam.py <parameters_file>")
             sys.exit(1)
-
-        time.sleep(9900) # 2 hours 45 minutes
 
         # Load parameters
         parameters_file = sys.argv[1]
