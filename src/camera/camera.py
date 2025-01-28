@@ -88,8 +88,8 @@ class Camera(Picamera2):
 
         # print(f"Symlink created to {save_path}")
 
-    # def capture_empty_frame(self, save_path):
-    #     Camera.capture_empty_frame(save_path, self.get_frame_dimensions(), self.recording_name)
+    def capture_empty_frame_instance(self, save_path):
+        Camera.capture_empty_frame(save_path, self.get_frame_dimensions(), self.recording_name)
 
     @staticmethod
     def capture_empty_frame(save_path, frame_dimensions, recording_name):

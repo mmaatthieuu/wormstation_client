@@ -55,7 +55,7 @@ def main():
             elif command.startswith("empty"):
                 _, save_path = command.split(maxsplit=1)
                 print(f"[Camera Script] Capturing empty frame to {save_path}...")
-                camera.capture_empty_frame(save_path)
+                camera.capture_empty_frame_instance(save_path)
                 print(f"\nSUCCESS: Empty frame saved to {save_path}.", flush=True)
             else:
                 print("\nERROR: Unknown command.", flush=True)
