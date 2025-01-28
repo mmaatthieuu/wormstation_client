@@ -88,8 +88,8 @@ class Camera(Picamera2):
 
         # print(f"Symlink created to {save_path}")
 
-    def capture_empty_frame(self, save_path):
-        Camera.capture_empty_frame(save_path, self.get_frame_dimensions(), self.recording_name)
+    # def capture_empty_frame(self, save_path):
+    #     Camera.capture_empty_frame(save_path, self.get_frame_dimensions(), self.recording_name)
 
     @staticmethod
     def capture_empty_frame(save_path, frame_dimensions, recording_name):
@@ -330,7 +330,12 @@ class CameraController:
                 self.logger.log(f"Error capturing empty frame: {e}", log_level=1)
                 raise
         elif self.safe_mode:
-            Camera.capture_empty_frame(save_path, self.frame_dimensions, self.parameters["recording_name"])
+            try:
+                Camera.capture_empty_frame(save_path, self.frame_dimensions, self.parameters["recording_name"])
+            except Exception as e:
+                # print(f"[Main Script] Error capturing empty frame: {e}")
+                self.logger.log(f"Error capturing empty frame: {e}", log_level=1)
+
 
     def stop(self):
         """Stop the camera script."""
