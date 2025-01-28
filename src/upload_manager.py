@@ -26,7 +26,7 @@ class UploadManager:
         self.compress_process = None
 
         # Start the process manager
-        self.manager_process = Process(target=self._process_queue, daemon=True)
+        self.manager_process = Process(target=self._process_queue)
         self.manager_process.start()
 
 
