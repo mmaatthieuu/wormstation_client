@@ -41,6 +41,11 @@ class WormstationMonitor:
         self.ignored_manager = ignored_manager
 
         self.recordings_to_recheck_later = []
+        self.skipped_folders = []
+        self.terminated_recordings = []
+        self.recordings_ok = []
+        self.recordings_not_ok = []
+        self.recordings_potentially_not_ok = []
 
     @staticmethod
     def extract_json_from_log(file_path):
@@ -147,6 +152,9 @@ class WormstationMonitor:
             if os.path.isdir(os.path.join(self.recording_path, f))
         ]
 
+        # Sort the recordings by name
+        recordings.sort()
+
         # Get the list of folders to ignore
         excluded_folders = self.get_excluded_folders()
 
@@ -155,7 +163,8 @@ class WormstationMonitor:
 
             # Skip excluded folders
             if recording_path in excluded_folders:
-                print(f"Skipping ignored folder: {recording_path}")
+                # print(f"Skipping ignored folder: {recording_path}")
+                self.skipped_folders.append(recording_path)
                 continue
 
             # Extract the start time from the folder name
@@ -167,6 +176,14 @@ class WormstationMonitor:
 
             # Check all devices in this recording
             self.check_devices_in_recording(recording_path, start_time)
+
+        # Print summary of results
+        print("\nSummary:")
+        print(f"  Skipped folders: {len(self.skipped_folders)}")
+        print(f"  Terminated recordings: {len(self.terminated_recordings)}")
+        print(f"  Recordings OK: {len(self.recordings_ok)}")
+        print(f"  Recordings not OK: {len(self.recordings_not_ok)}")
+        print(f"  Recordings potentially not OK: {len(self.recordings_potentially_not_ok)}")
 
         # Recheck flagged recordings
         if self.recordings_to_recheck_later:
@@ -198,6 +215,7 @@ class WormstationMonitor:
 
             if device_path in excluded_folders:
                 print(f"Skipping ignored folder: {device_path}")
+                self.skipped_folders.append(device_path)
                 continue
 
             self.check_device_logs_and_videos(device_path, start_time)
@@ -225,7 +243,8 @@ class WormstationMonitor:
             timeout = parameters.get("timeout")
             elapsed_time = (datetime.now() - start_time).total_seconds()  # Total elapsed time in seconds
             if elapsed_time > timeout:
-                print(f"  {log_file} has timed out")
+                # print(f"  {log_file} has timed out")
+                self.terminated_recordings.append((device_path, start_time))
                 continue
 
             # Get video files in the folder
@@ -255,13 +274,16 @@ class WormstationMonitor:
                      f"If you want to ignore future warnings for this folder, reply to this email with the text:\n"
                      f"IGNORE:{device_path}"
             )
+            self.recordings_not_ok.append((device_path, actual, expected))
             return True
         elif actual < expected:
             print(
                 f"  {device_path} has {actual} video files but {expected} were expected. Video compression may be ongoing.")
+            self.recordings_potentially_not_ok.append((device_path, actual, expected))
             return False
         else:
             print(f"  {device_path} has the expected number of video files.")
+            self.recordings_ok.append((device_path, actual, expected))
             return True
 
 
