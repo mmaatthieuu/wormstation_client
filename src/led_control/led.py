@@ -42,7 +42,7 @@ class LED:
             self.logger.log(f"Terminating LED program for {self.name}", log_level=5)
             self.running.clear()
             self.pause_event.set()  # Ensure it doesn't hang on pause
-            self.program.join(timeout=2)  # Ensure the thread has terminated
+            self.program.join(timeout=20)  # Ensure the thread has terminated
             if self.program.is_alive():
                 self.logger.log(f"Failed to terminate LED program for {self.name}", log_level=3)
             else:
@@ -107,7 +107,7 @@ class LED:
         - timeout: The total time for which the LED should run, in seconds.
         - blinking: A flag to indicate whether the LED should blink or stay on.
         """
-        timeout += period * 2  # Ensure some extra time buffer
+        timeout += period  # Ensure some extra time buffer
 
         def led_timer_thread():
             end_time = time.time() + timeout

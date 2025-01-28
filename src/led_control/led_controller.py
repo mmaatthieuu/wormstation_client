@@ -101,7 +101,10 @@ class LightController:
 
         if self.parameters["optogenetic"]:
             try:
+
                 color = self.parameters["optogenetic_color"]
+                if self[color] is None:
+                    raise KeyError()
 
                 self[color].run_led_timer(duration=self.parameters["pulse_duration"],
                                              period=self.parameters["pulse_interval"],
