@@ -257,7 +257,7 @@ class WormstationMonitor:
 
             if not self.compare_video_count(device_path, len(video_files), expected_videos, force_alert):
                 if not force_alert:
-                    self.recordings_to_recheck_later.add((device_path, start_time))
+                    self.recordings_to_recheck_later.append((device_path, start_time))
 
 
     def compare_video_count(self, device_path, actual, expected, force_alert=False):
