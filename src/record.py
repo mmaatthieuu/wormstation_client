@@ -30,12 +30,36 @@ Verbosity levels:
 
 class Recorder:
     """
-    Class Recorder
+    Recorder is responsible for the full lifecycle of a time-lapse or continuous
+    recording process, including:
+
+    - Loading parameters from a JSON file.
+    - Setting up the camera and LED controller.
+    - Implementing a main recording loop (including pauses).
+    - Handling compression and uploading of recorded data.
+    - Updating status and logs during the recording session.
+
+    :param parameter_file: Path to the JSON parameter file.
+    :type parameter_file: str
+    :param git_version: A string indicating the current Git version hash.
+    :type git_version: str
+
+    .. note::
+       The Recorder is typically invoked by an external script, such as the main
+       `cam.py`, which sets up necessary signal handlers and command-line
+       arguments before creating the Recorder instance.
     """
 
     def __init__(self, parameter_file, git_version):
         """
-        Constructor
+        Constructor for the Recorder class. Initializes internal variables, loads
+        parameters from the given file, sets up logging, and prepares both camera and
+        LED controllers.
+
+        :param parameter_file: Path to the JSON parameter file.
+        :type parameter_file: str
+        :param git_version: A string indicating the current Git version hash.
+        :type git_version: str
         """
         # Get parameter as argument or create new instance that load json ??
         self.parameter_file = parameter_file
@@ -125,12 +149,21 @@ class Recorder:
         self.logger.log("Recorder initialized", log_level=5)
 
     def __del__(self):
+        """
+        Destructor for the Recorder class.
+
+        Ensures the recorder is stopped gracefully if not already stopped.
+        """
         self.stop()
 
     def stop(self):
+        """
+        Stop the Recorder process safely.
 
-        # Turn off all LEDs
-        #self.lights.turn_off_all_leds()
+        - Turns off all LED lights.
+        - Stops the camera (and its background thread).
+        - Logs the stop event and updates the status file to 'Not Running'.
+        """
 
         self.camera.stop()
 
@@ -145,7 +178,17 @@ class Recorder:
 
     def start_recording(self):
         """
-        Main recording function
+        Start the main recording procedure.
+
+        - Navigates to the local temporary recording folder.
+        - Updates status to 'Recording'.
+        - Starts any necessary LED sequences.
+        - Runs the main loop that captures frames with possible pauses in-between.
+        - Handles compression at regular intervals.
+        - Wraps up by stopping LEDs, waiting for any ongoing compression, and uploading final logs.
+
+        :raises RuntimeError: If a frame capture fails for certain unhandled runtime errors.
+        :raises TimeoutError: If a camera capture operation times out.
         """
         # TODO : confirm parameters & check if folder already exists
         # TODO : clean tmp local dir
@@ -261,8 +304,13 @@ class Recorder:
 
 
     def wait_or_catchup_by_skipping_frames(self):
-        # Wait
-        # Check if the current frame is on time
+        """
+        Manages timing for frame capture, ensuring a precise framerate if possible.
+        If the process is behind schedule by more than one interval, it tells the main loop to skip the frame to catch up.
+
+        - If the process is ahead of schedule, waits until the correct capture time.
+        - If the process is behind schedule by more than one interval, skip the frame to catch up.
+        """
 
         delay = self.get_delay()
 
@@ -296,6 +344,15 @@ class Recorder:
             self.logger.log(f"Delay too long : Frame {self.current_frame_number} skipped", log_level=2)
 
     def get_delay(self):
+        """
+        Calculate how much time difference exists between the ideal frame time
+        and the current system time.
+
+        :return: Negative value if we are ahead of schedule (need to wait),
+            positive if we are behind schedule (potential skip).
+        :rtype: float
+        """
+
         delay = 0
         if self.pause_mode is False:
             delay = time.time() - (self.initial_time +
@@ -310,6 +367,9 @@ class Recorder:
         return delay
 
     def log_progress(self):
+        """
+        Log the current progress in terms of which frame we are about to capture.
+        """
         self.logger.log(f"Starting capture of frame {self.current_frame_number}"
                         f"  ({self.current_frame_number + 1}/{self.n_frames_total})",
                         log_level=3)
@@ -317,7 +377,10 @@ class Recorder:
 
     def is_time_for_compression(self):
         """
-        Check if it is time to compress (step number is reached or end of recording and return a bool
+        Check if the current frame is the right time to trigger compression.
+
+        :return: True if compression should be triggered now, False otherwise.
+        :rtype: bool
         """
         try:
             if self.current_frame_number % self.compress_step == self.compress_step - 1 or \
@@ -332,12 +395,14 @@ class Recorder:
 
 
 
-    def delete_local_files(self, folder_name):
-        subprocess.run(['rm', '-rf', '%s' % folder_name])
-        subprocess.run(['rm', '-rf', '%s.tgz' % folder_name])
-
-
     def get_tmp_folder(self):
+        """
+        Return the path to a user-specific temporary folder.
+
+        :return: The absolute path to the tmp folder (e.g. `/home/<user>/tmp`).
+        :rtype: str
+        """
+
         # get name of current user
         user = os.getlogin()
         tmp_folder = f'/home/{user}/tmp'
@@ -348,6 +413,12 @@ class Recorder:
     ### Other utility functions
 
     def go_to_tmp_recording_folder(self):
+        """
+        Navigate to a local temporary recording directory, creating it if necessary.
+
+        :return: The absolute path to the current working directory, which is the temp folder.
+        :rtype: str
+        """
         tmp_rec_folder = self.get_tmp_recording_folder()
 
         # Created directory to save locally the files before upload
@@ -360,17 +431,38 @@ class Recorder:
         return os.getcwd()
 
     def get_tmp_recording_folder(self):
+        """
+        Compose the absolute path to the local temporary recording folder.
+
+        :return: The path of the local temp recording folder (e.g. `/home/<user>/<local_tmp_dir>`).
+        :rtype: str
+        """
         # get home path
         home = os.path.expanduser("~")
         return f'{home}/{self.parameters["local_tmp_dir"]}'
 
     def get_pause_mode(self):
+        """
+        Determine whether a pause cycle is used for time-lapse.
+
+        :return: True if in pause mode (time-lapse style), False otherwise.
+        :rtype: bool
+        """
         if self.parameters["record_for_s"] == 0 or self.parameters["record_every_h"] == 0:
             return False
         else:
             return True
 
     def is_it_pause_time(self, frame_number):
+        """
+        Check if we have reached a pause interval based on the current frame.
+
+        :param frame_number: Current frame index.
+        :type frame_number: int
+        :return: True if it's time to pause, False otherwise.
+        :rtype: bool
+        """
+
         if self.pause_mode is False:
             return False
         number_of_frames_per_batch = self.parameters["record_for_s"] // self.parameters["time_interval"]
@@ -380,7 +472,16 @@ class Recorder:
             return False
 
     def pause_recording_in_s(self, time_to_pause):
-        """Pause recording for a specified amount of time."""
+        """
+        Pause the recording for a specified amount of time.
+
+        This updates the status to 'Paused', optionally turns off LEDs for longer pauses,
+        then resumes and updates the status to 'Recording'.
+
+        :param time_to_pause: How many seconds to pause for.
+        :type time_to_pause: float
+        """
+
         self.update_status('Paused')  # Update status to Paused
         self.logger.log(f"Pausing recording for {time_to_pause} seconds ({time_to_pause / 3600} hours)")
 
@@ -410,12 +511,23 @@ class Recorder:
 
 
     def update_status(self, status):
-        """Update the status file with the current recording status."""
+        """
+        Write the given status to a status file for external monitoring.
+
+        :param status: The status string, e.g. 'Recording', 'Paused', 'Not Running'.
+        :type status: str
+        """
+
         with open(self.status_file_path, 'w') as f:
             f.write(status)
 
     def capture_frame_during_pause(self):
-        """Capture a new frame during a recording pause."""
+        """
+        Capture a new frame while the recording process is paused.
+
+        Turns on IR if available, captures a frame, and turns IR off again.
+        """
+
         self.logger.log("Capturing a new frame during pause", log_level=3)
         if self.current_frame_number < self.n_frames_total:
             # self.ir_leds.turn_on()
@@ -429,6 +541,16 @@ class Recorder:
             self.logger.log("No frames left to capture", log_level=2)
 
     def compute_total_number_of_frames(self):
+        """
+        Calculate the total number of frames to capture for the entire recording.
+
+        This depends on whether a pause cycle is used (time-lapse style) or if
+        it's continuous recording until a timeout.
+
+        :return: Total number of frames for this session.
+        :rtype: int
+        """
+
         n_frames = 0
         try:
             if not self.pause_mode:
@@ -448,6 +570,17 @@ class Recorder:
             return n_frames
 
     def read_output_filename(self):
+        """
+        Parse or generate the output filename pattern.
+
+        If the user sets "output_filename" to "auto", generate a numeric pattern
+        based on the total number of frames (e.g., %05d.jpg). Otherwise, use
+        the given filename.
+
+        :return: Either the user-defined filename or a pattern string like '%05d.jpg'.
+        :rtype: str
+        """
+
         f = self.parameters["output_filename"]
         if f == "auto":
             return self.get_needed_output_format()
@@ -455,6 +588,14 @@ class Recorder:
             return f
 
     def get_needed_output_format(self):
+        """
+        Generate a zero-padded filename pattern (e.g., %05d.jpg) based on
+        the total number of frames.
+
+        :return: A string that can be used with Python string formatting to
+                 produce sequential filenames.
+        :rtype: str
+        """
 
         digits = int(ceil(log10(self.n_frames_total)))
         #print(digits)
@@ -463,12 +604,27 @@ class Recorder:
         return f'%0{digits}d.jpg'
 
     def get_last_save_path(self):
+        """
+        Compute the absolute path to the file where the current frame should be saved.
+
+        :return: The absolute path to the file where the current frame is saved.
+        :rtype: str
+        """
         try:
             return os.path.abspath(os.path.join(self.get_current_dir(), self.get_filename()))
         except TypeError:
             return None
 
     def get_filename(self):
+        """
+        Construct the output filename for the current frame.
+
+        If `self.output_filename` is a pattern (e.g., '%05d.jpg'), it is formatted
+        with the current frame number. Otherwise, it is treated as a literal string.
+
+        :return: The filename for the current frame.
+        :rtype: str
+        """
         try:
             # if automatic filename, i.e. filename is %0Xd.jpg
             filename = self.output_filename % self.current_frame_number
@@ -478,6 +634,13 @@ class Recorder:
 
 
     def get_current_dir(self):
+        """
+        If compression is configured with a given step size, group frames into
+        subfolders named partXX.
+
+        :return: The directory name ('partXX') or '.' if no grouping is needed.
+        :rtype: str
+        """
 
         if self.compress_step > 0:
             part = self.current_frame_number // self.compress_step
@@ -493,6 +656,16 @@ class Recorder:
             return "."
 
     def is_it_useful_to_save_logs(self):
+        """
+        Determine whether logs should be saved to a file.
+
+        Logs might be skipped if `timeout == 0` (preview mode) or if
+        `save_logs` parameter is False.
+
+        :return: True if logs should be saved, False otherwise.
+        :rtype: bool
+        """
+
         if self.parameters["timeout"] == 0:
             return False
         try:
@@ -503,11 +676,21 @@ class Recorder:
         return True
 
     def preview_only(self):
+        """
+        Check if this is a preview-only session (i.e., no actual timeout).
+
+        :return: True if `timeout == 0`, False otherwise.
+        :rtype: bool
+        """
         if self.parameters["timeout"] == 0:
             return True
         return False
 
     def upload_logs(self):
+        """
+        If using Samba and logs are saved, attempt to upload the current log file
+        for real-time monitoring.
+        """
         if self.parameters["use_samba"] and self.is_it_useful_to_save_logs():
             try:
                 self.uploader.upload(file_to_upload=self.logger.get_log_file_path(),

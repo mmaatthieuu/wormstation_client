@@ -20,11 +20,6 @@ from src.parameters import Parameters
 
 from src.record import Recorder
 
-# TODO make that git check better
-git_check = subprocess.run(['git', '--git-dir=/home/matthieu/piworm/.git', 'rev-list',
-                            '--all', '--abbrev-commit', '-n', '1'], text=True, capture_output=True)
-version = git_check.stdout
-
 import os
 import subprocess
 
