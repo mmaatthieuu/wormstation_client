@@ -24,6 +24,7 @@ This software is made to be remotely controlled by the
 - **Hardware Integration:** Seamlessly integrates with FT232H for SPI communication.
 - **Monitoring Tools:** Monitor the recording processes and system status.
 
+![Wormstation Client in Action](doc/wormstation_animation.gif)
 ---
 
 ## Setup and Installation
@@ -143,6 +144,11 @@ The program requires a JSON file with the following structure:
 ├── tests/               # Unit tests
 └── wormstation_setup.jpg # Hardware setup image
 ```
+
+### Architecture
+![Wormstation Architecture](doc/wormstation_code_arch.png)
+
+![Lighting Control Architecture](doc/led_control.png)
 
 ### Contributing
 1. Fork the repository.

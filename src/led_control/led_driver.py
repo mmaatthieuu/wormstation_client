@@ -1,7 +1,7 @@
 import time
 
 class LEDDriver:
-    """Class to control the LED driver (LP5860T) using SPI communication."""
+    """Class to control the LED driver (LP5860T) using SPI communication. Low-level control of the LP5860T driver."""
 
     def __init__(self, usb_handler, channel, current, logger=None):
         self.logger = logger
@@ -133,6 +133,16 @@ class LEDDriver:
         """Set the PWM brightness for all dots."""
         registers = {reg: brightness for reg in range(0x200, 0x2C5)}
         self.write_multiple_registers(registers)
+
+    def turn_on_leds(self):
+        """Turn on all LEDs."""
+        self.set_pwm_brightness(0xFF)
+        return True
+
+    def turn_off_leds(self):
+        """Turn off all LEDs."""
+        self.set_pwm_brightness(0x00)
+        return False
 
     def read_current_input(self, current):
         current_levels = {'7.5mA': 0, '12.5mA': 1, '25mA': 2, '37.5mA': 3, '50mA': 4, '75mA': 5, '100mA': 6, 'max': 7}

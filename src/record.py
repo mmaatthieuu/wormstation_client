@@ -3,7 +3,7 @@ import json
 
 from math import log10, ceil
 
-from src.camera.camera import CameraController
+from src.camera.camera_controller import CameraController
 from src.led_control.led_controller import LightController
 from src.parameters import Parameters
 

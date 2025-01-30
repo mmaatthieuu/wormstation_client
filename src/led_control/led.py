@@ -7,7 +7,10 @@ from src.led_control.led_driver import LEDDriver
 
 
 class LED:
-    """Class to control an LED using the FT232H chip."""
+    """
+    Class to control a LED array using the FT232H chip and LED driver. High-level control of the LED.
+    Wrapper class for the LEDDriver to control the LED array and do specific LED operations.
+    """
 
     def __init__(self, usb_handler, channel, current='7.5mA', logger=None, name=None, final_state=False):
         self.channel = channel  # SPI channel for this LED
@@ -28,13 +31,11 @@ class LED:
 
     def turn_on(self):
         self.logger.log(f'Turning on {self.name} LED', log_level=5)
-        self.led_driver.set_pwm_brightness(0xFF)
-        self.is_on = True
+        self.is_on = self.led_driver.turn_on_leds()
 
     def turn_off(self):
         self.logger.log(f'Turning off {self.name} LED', log_level=5)
-        self.led_driver.set_pwm_brightness(0x00)
-        self.is_on = False
+        self.is_on = self.led_driver.turn_off_leds()
 
     def cleanup(self):
         """Cleanup the LED processes and turn it off."""
@@ -138,7 +139,7 @@ class LED:
 
 
 class LEDLegacy(LED):
-
+    """Class to control a LED using the GPIO pins directly."""
     def __init__(self, _control_gpio_pin, logger=None, name=None, keep_state=False):
         super().__init__(None, None, None, logger, name, keep_state)
         GPIO.setwarnings(False)
