@@ -122,7 +122,7 @@ class Diagnostic:
         Automatically test LEDs by capturing images and checking brightness levels.
 
         :param threshold: The minimum average pixel value to consider the LED as ON.
-        :return: A dictionary with device name and LED statuses.
+        :return: A dictionary with LED names and their detected states (ON/OFF).
         """
 
         import numpy as np
@@ -169,7 +169,7 @@ class Diagnostic:
 
             time.sleep(0.1)  # Allow time for the light to turn off
 
-        return {"device": self.name, "status": results}
+        return results
 
 
 
