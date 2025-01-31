@@ -91,10 +91,29 @@ script_dir=$(dirname "$(realpath "$0")")
 
 # Create a symbolic link for picam
 script_path="$script_dir/cam.py"
+led_switch_path="$script_dir/led_switch.py"
+self_check_path="$script_dir/self_check.py"
 
 if sudo ln -sfn $script_path /usr/local/bin/picam; then
     echo "Symbolic link 'picam' successfully created or updated in /usr/local/bin."
     echo "New link: $(readlink -f /usr/local/bin/picam)"
+    chmod +x $script_path
+else
+    echo "Failed to create symbolic link. Please check the script path and try again."
+fi
+
+if sudo ln -sfn $led_switch_path /usr/local/bin/led_switch; then
+    echo "Symbolic link 'led_switch' successfully created or updated in /usr/local/bin."
+    echo "New link: $(readlink -f /usr/local/bin/led_switch)"
+    chmod +x $led_switch_path
+else
+    echo "Failed to create symbolic link. Please check the script path and try again."
+fi
+
+if sudo ln -sfn $self_check_path /usr/local/bin/self_check; then
+    echo "Symbolic link 'self_check' successfully created or updated in /usr/local/bin."
+    echo "New link: $(readlink -f /usr/local/bin/self_check)"
+    chmod +x $self_check_path
 else
     echo "Failed to create symbolic link. Please check the script path and try again."
 fi

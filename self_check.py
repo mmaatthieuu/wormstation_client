@@ -1,3 +1,6 @@
+#!/usr/bin/python3 -u
+
+
 import sys
 import json
 from src.tools.self_check.diagnostic import Diagnostic

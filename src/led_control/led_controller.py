@@ -18,7 +18,7 @@ class LightController:
     """Class to control the LEDs using the FT232H chip."""
 
 
-    def __init__(self, parameters, logger=None, empty=False, keep_final_state=False, enable_legacy_gpio_mode=False):
+    def __init__(self, parameters=None, logger=None, empty=False, keep_final_state=False, enable_legacy_gpio_mode=False):
         """
         :param logger: The logger instance to use for logging messages.
         :param empty: A flag to initialize the LightController without any LEDs.
@@ -72,7 +72,6 @@ class LightController:
 
             if self.spi_controller:
                 self.spi_controller.close()
-                self.device_connected = False
 
             if enable_legacy_gpio_mode:
                 """
@@ -89,7 +88,11 @@ class LightController:
                 self.device_connected = True
                 self.legacy_gpio_mode = True
 
+            else:
+                self.device_connected = False
+
         finally:
+            self.logger.log("LightController initialization complete.", log_level=5)
             self.initialized.set()  # Signal that initialization is complete
 
     def start(self):
@@ -126,6 +129,7 @@ class LightController:
     def wait_until_ready(self):
         """Block until initialization is complete."""
         self.initialized.wait()
+        self.logger.log("LightController is ready.", log_level=5)
 
     def legacy_mode(self):
         """Check if the LightController is in legacy GPIO mode."""
@@ -149,9 +153,13 @@ class LightController:
         self.logger.log("LightController resources cleaned up.", log_level=5)
 
     def close(self):
+        """Close the LightController."""
+        self.logger.log("Closing LightController...", log_level=5)
         close_thread = threading.Thread(target=self.close_func)
         close_thread.start()
         close_thread.join()
+
+    __del__ = close
 
     def add_LED(self, name, channel, current='7.5mA', final_state=False):
         """Add a new LED to the LightController."""

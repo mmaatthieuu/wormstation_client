@@ -1,7 +1,10 @@
+#!/usr/bin/python3 -u
+
+
 import argparse
 import time
 import threading
-from src.led_controller import LightController  # Adjust the path based on your actual file structure
+from src.led_control.led_controller import LightController  # Adjust the path based on your actual file structure
 from src.log import FakeLogger  # Assuming you have the FakeLogger or another logger implementation
 
 

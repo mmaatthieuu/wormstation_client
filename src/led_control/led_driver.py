@@ -11,9 +11,6 @@ class LEDDriver:
             self.channel = channel  # SPI channel
             self.current_level = self.read_current_input(current)
 
-            print(f'Input current: {current}')
-            print(f"Current level read from input: {self.current_level}")
-
             num_lines = self.get_max_num_lines()
 
             self.initialize(num_lines)
@@ -70,7 +67,7 @@ class LEDDriver:
             new_value = (default_value & 0b11110001) | ((current_level << 1) & 0b00001110)
 
             self.write_register(0x004, new_value)
-            print(f"Set maximum current to level {current_level}")
+            #print(f"Set maximum current to level {current_level}")
 
     def write_register(self, register, data):
         """Write data to a specific register on the SPI device."""

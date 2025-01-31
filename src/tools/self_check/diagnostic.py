@@ -13,7 +13,7 @@ class Diagnostic:
     def __init__(self, parameter_filepath):
         self.parameter_filepath = parameter_filepath
         self.parameters = Parameters(parameter_filepath)
-        self.logger = Logger(verbosity_level=5)
+        self.logger = Logger(verbosity_level=0)
         self.uploader = None
         self.lights = None
 
@@ -27,7 +27,8 @@ class Diagnostic:
                 share_name=self.parameters["share_name"],
                 credentials_file=self.parameters["credentials_file"],
                 working_dir=self.parameters["smb_dir"],
-                recording_name=self.parameters["recording_name"]
+                recording_name=self.parameters["recording_name"],
+                logger=self.logger
             )
 
         nas_accessible = self.uploader.is_accessible()
@@ -99,8 +100,9 @@ class Diagnostic:
         if not hasattr(self, 'lights') or self.lights is None:
             # ✅ Create lights only if not already initialized
             self.lights = LightController(parameters=self.parameters, logger=self.logger)
+            self.lights.wait_until_ready()
 
-        return self.lights.is_connected()
+        return self.lights.device_connected
 
     def LED_test(self, delay=0):
         duration = 0.5
@@ -109,15 +111,69 @@ class Diagnostic:
         blinking = False
         if self.light_pcb():
             time.sleep(delay)
-            for led in self.lights.leds:
+            for led in self.lights.leds.values():
                 led.run_led_timer(duration, period, timeout, blinking)
                 led.wait_end_of_led_timer()
             return True
         return False
 
+    def auto_LED_test(self, threshold=50):
+        """
+        Automatically test LEDs by capturing images and checking brightness levels.
+
+        :param threshold: The minimum average pixel value to consider the LED as ON.
+        :return: A dictionary with LED names and their detected states (ON/OFF).
+        """
+
+        import numpy as np
+        from PIL import Image
+
+        connected = self.light_pcb()
+        camera = Camera(parameters=self.parameters)
+
+        colors = ["Orange", "Blue"]
+        results = {}
+
+        for color in colors:
+            if connected and self.lights[color]:
+                self.lights[color].turn_on()
+
+            time.sleep(0.1)  # Allow time for the light to turn on
+            image_path = f"test_{color}.jpg"
+            print(os.path.abspath(image_path))
+            camera.capture_frame(image_path)
+            time.sleep(0.5)
+
+            # Compute the average of the pixel values
+            try:
+                image = Image.open(image_path).convert("L")  # Convert to grayscale
+                pixel_array = np.array(image)
+                avg_pixel_value = np.mean(pixel_array)
+
+                # Determine if the LED is ON or OFF based on the threshold
+                led_status = "ON" if avg_pixel_value > threshold else "OFF"
+                results[color] = led_status
+
+                self.logger.log(f"LED {color}: Avg Pixel Value = {avg_pixel_value:.2f}, Status = {led_status}",
+                                log_level=3)
+
+            except Exception as e:
+                self.logger.log(f"Error processing image {image_path}: {e}", log_level=1)
+                results[color] = "ERROR"
+
+            if connected and self.lights[color]:
+                self.lights[color].turn_off()
+
+            time.sleep(0.1)  # Allow time for the light to turn off
+
+        return results
+
+
+
+
     def camera_status(self):
-        camera = Camera(parameters=self.parameters, partial_init=True)
-        return camera.is_connected()
+        # camera = Camera(parameters=self.parameters, partial_init=True)
+        return Camera.is_connected()
 
     def run_all(self):
         results = {
