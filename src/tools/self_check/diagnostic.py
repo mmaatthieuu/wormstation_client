@@ -131,6 +131,8 @@ class Diagnostic:
         connected = self.light_pcb()
         camera = Camera(parameters=self.parameters)
 
+        hostname = subprocess.check_output(['hostname']).decode().strip()
+
         colors = ["Orange", "Blue"]
         results = {}
 
@@ -169,7 +171,7 @@ class Diagnostic:
 
             time.sleep(0.1)  # Allow time for the light to turn off
 
-        return results
+        return {"device": hostname, "results": results}
 
 
 
