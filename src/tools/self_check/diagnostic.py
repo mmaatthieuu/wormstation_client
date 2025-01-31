@@ -138,7 +138,7 @@ class Diagnostic:
             if connected and self.lights[color]:
                 self.lights[color].turn_on()
 
-            time.sleep(0.1)  # Allow time for the light to turn on
+            time.sleep(0.5)  # Allow time for the light to turn on
             image_path = f"test_{color}.jpg"
             print(os.path.abspath(image_path))
             camera.capture_frame(image_path)
