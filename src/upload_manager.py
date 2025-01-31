@@ -17,7 +17,12 @@ class UploadManager:
     def __init__(self, remote_server, remote_dir, recording_name, local_dir=None, logger=None):
         self.username, self.uid, self.gid = self.get_user_info()
         self.remote_server = remote_server
-        self.logger = logger
+
+        if logger is None:
+            from src.log import Logger
+            self.logger = Logger(verbosity_level=5)
+        else:
+            self.logger = logger
         self.remote_dir = self.get_tree_structure(remote_dir, recording_name)
         self.local_dir = local_dir if local_dir else f"/home/{self.username}/Remote"
         self.full_path = os.path.join(self.local_dir, self.remote_dir)

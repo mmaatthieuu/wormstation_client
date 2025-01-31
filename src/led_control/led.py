@@ -137,6 +137,11 @@ class LED:
         except AttributeError:
             self.logger.log("Illumination PCB not connected", log_level=3)
 
+    def wait_end_of_led_timer(self):
+        """Wait for the LED timer to end."""
+        if self.program and self.program.is_alive():
+            self.program.join(timeout=20)
+
 
 class LEDLegacy(LED):
     """Class to control a LED using the GPIO pins directly."""

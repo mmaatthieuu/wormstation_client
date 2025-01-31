@@ -32,14 +32,14 @@ This software is made to be remotely controlled by the
 ### Requirements
 
 #### Hardware:
-- Raspberry Pi (tested on Raspberry Pi 4B)
+- Raspberry Pi (tested on Raspberry Pi 4B, 2GB)
 - Raspberry Pi Camera
 - FT232H USB to SPI bridge
 - LP5860T-based LED drivers
 - LEDs (IR, Orange, Blue)
 
 #### Software:
-- Raspberry Pi OS (Debian-based)
+- Raspberry Pi OS (Debian-based, tested on Bullseye)
 - Python 3.x
 
 ### Installation
