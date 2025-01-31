@@ -157,6 +157,9 @@ class Diagnostic:
                 self.logger.log(f"LED {color}: Avg Pixel Value = {avg_pixel_value:.2f}, Status = {led_status}",
                                 log_level=3)
 
+                # Remove the image file
+                os.remove(image_path)
+
             except Exception as e:
                 self.logger.log(f"Error processing image {image_path}: {e}", log_level=1)
                 results[color] = "ERROR"
