@@ -324,6 +324,9 @@ class UploadManager:
         # Get list of files in the current directory, excluding directories
         files = [f for f in os.listdir(rec_folder) if os.path.isfile(os.path.join(rec_folder, f))]
 
+        # Filter out empty files
+        files = [f for f in files if os.path.getsize(os.path.join(rec_folder, f)) > 0]
+
         # Log files that are not uploaded
         self.logger.log(f"Files not uploaded : {files}", log_level=3)
 
