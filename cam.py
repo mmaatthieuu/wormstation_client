@@ -133,12 +133,20 @@ def main():
             recorder.logger.log("Keyboard interrupt. Stopping recording.")
             print("Keyboard interrupt. Stopping recording.")
         finally:
-            del recorder
+            try:
+                del recorder
+            except AttributeError:
+                pass
+            except Exception as e:
+                print(f"Error: {e}")
 
     except FileNotFoundError as e:
         print(e)
         sys.exit(1)
     except ValueError as e:
+        print(e)
+        sys.exit(1)
+    except RuntimeError as e:
         print(e)
         sys.exit(1)
     # except Exception as e:

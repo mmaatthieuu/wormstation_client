@@ -61,6 +61,7 @@ class Recorder:
         :param git_version: A string indicating the current Git version hash.
         :type git_version: str
         """
+
         # Get parameter as argument or create new instance that load json ??
         self.parameter_file = parameter_file
         self.parameters = Parameters(parameter_file)
@@ -69,6 +70,8 @@ class Recorder:
 
         self.logger.log("Initializing recorder", log_level=5)
         self.logger.log("Git version : %s" % git_version, log_level=3)
+
+        self.compatibility_check()
 
         self.status_file_path = f'{self.get_tmp_folder()}/status.txt' # Path to the status file
 
@@ -693,6 +696,28 @@ class Recorder:
                                  filename_at_destination=self.logger.get_log_filename())
             except TypeError:
                 pass
+
+
+
+    def compatibility_check(self):
+        """
+        Check if the current configuration is compatible with the current hardware.
+
+        This method ensures that required dependencies are installed.
+
+        :raises RuntimeError: If `led_switch` is not found in PATH, suggesting the user run the install script.
+        """
+        import shutil
+        if shutil.which("led_switch") is None:
+            self.logger.log("Compatibility check failed: 'led_switch' is not available."
+                            "Please run the install script.", log_level=1)
+            print("The required command 'led_switch' is not found in PATH. "
+                  "Please run the install script to set up the environment.")
+            raise RuntimeError("The required command 'led_switch' is not found in PATH. "
+                               "Please run the install script to set up the environment.")
+
+        self.logger.log("Compatibility check passed: 'led_switch' is available.", log_level=3)
+
 
 
 
