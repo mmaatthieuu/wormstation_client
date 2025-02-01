@@ -41,6 +41,9 @@ class Diagnostic:
 
         nas_accessible, nas_mounted = self.NAS_status()
 
+        if nas_mounted:
+            return True
+
         if nas_accessible and not nas_mounted:
             self.uploader.mount()  # ✅ Uses self.uploader directly
             return True
