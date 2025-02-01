@@ -346,8 +346,8 @@ class UploadManager:
                     local_folder_save = os.path.join('../', self.remote_dir)
                     os.makedirs(local_folder_save, exist_ok=True)
                     # Move the file to the folder
-                    self.logger.log(f"Moving {file} to {local_folder_save}", log_level=3)
-                    os.rename(file, os.path.join(local_folder_save, file))
+                    # self.logger.log(f"Moving {file} to {local_folder_save}", log_level=3)
+                    # os.rename(file, os.path.join(local_folder_save, file))
 
 
         else:
