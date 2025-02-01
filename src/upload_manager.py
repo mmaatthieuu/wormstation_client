@@ -431,7 +431,7 @@ class SMBManager(UploadManager):
         ]
 
         try:
-            result = subprocess.run(mount_cmd, capture_output=True, timeout=30)  # Timeout set to 30 seconds
+            result = subprocess.run(mount_cmd, capture_output=True, timeout=15)  # Timeout set to 30 seconds
             if result.returncode != 0:
                 self.logger.log(f"Failed to mount NAS: {result.stderr.decode()}", log_level=1)
                 return False
