@@ -156,20 +156,24 @@ class CameraController:
             raise
 
     def capture_empty_frame(self, save_path):
-        """Capture an empty frame using the camera script."""
+        """Capture an empty frame using the camera script or fallback to a static method if needed."""
+
+        def try_static_method():
+            """Attempt to capture an empty frame using the static method."""
+            try:
+                Camera.capture_empty_frame(save_path, self.frame_dimensions, self.parameters["recording_name"])
+            except Exception as e:
+                self.logger.log(f"Error capturing empty frame with static method: {e}", log_level=1)
+
         if self.camera_available:
             try:
                 self.send_command(f"empty {save_path}")
             except Exception as e:
-                # print(f"[Main Script] Error capturing empty frame: {e}")
-                self.logger.log(f"Error capturing empty frame: {e}", log_level=1)
-                raise
+                self.logger.log(f"Error capturing empty frame: {e}, trying with static method", log_level=2)
+                if self.safe_mode:
+                    try_static_method()
         elif self.safe_mode:
-            try:
-                Camera.capture_empty_frame(save_path, self.frame_dimensions, self.parameters["recording_name"])
-            except Exception as e:
-                # print(f"[Main Script] Error capturing empty frame: {e}")
-                self.logger.log(f"Error capturing empty frame: {e}", log_level=1)
+            try_static_method()
 
 
     def stop(self):
