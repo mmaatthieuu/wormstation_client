@@ -201,13 +201,44 @@ class UploadManager:
         """
         self.compress_process.join()
 
+    def ensure_remote_access(self):
+        """Ensure the remote directory is accessible, attempting to mount if necessary."""
+        self.logger.log("Checking remote directory access...", log_level=5)
+
+        if self.is_mounted():
+            self.logger.log("Remote directory is already mounted", log_level=5)
+            return True
+
+        if not self.is_accessible():
+            self.logger.log("Remote directory is not reachable, skipping upload", log_level=1)
+            return False
+
+        self.logger.log("Remote directory is reachable. Attempting to mount...", log_level=3)
+
+        if not self.mount():
+            self.logger.log("Failed to mount, skipping upload", log_level=1)
+            return False
+
+        self.logger.log("Remote directory successfully mounted", log_level=3)
+        return True
+
     def compress_analyze_and_upload(self, folder_name, format, analyze=False):
         compressed_file = self.compress(folder_name=folder_name, format=format)
 
         # Check if the compressed file is valid
         if not self.check_compression(compressed_file):
             self.logger.log(f"Compression failed for {folder_name}. Original files retained.", log_level=1)
+
+            # Upload remaining files
+            abs_path = os.path.abspath(folder_name)
+            parent_folder = os.path.dirname(abs_path)
+            self.upload_remaining_files(parent_folder)
+
             return False  # Exit early without deleting the original files
+
+        # Delete original folder only after all checks pass
+        self.logger.log(f"Removing original folder {folder_name}", log_level=5)
+        subprocess.run(['rm', '-rf', '%s' % folder_name])
 
         # Perform analysis if required
         output_files = []
@@ -222,16 +253,10 @@ class UploadManager:
         self.logger.log(f"Output files : {output_files}", log_level=5)
 
         # Upload the compressed file(s) and validate uploads
+        if not self.ensure_remote_access():
+            return False  # Stop if we can't access the remote directory
+
         for output_file in output_files:
-
-            # Check if NAS is mounted and accessible
-            if not self.is_mounted() or not self.is_accessible():
-                self.logger.log("Remote directory is not accessible, trying to mount it", log_level=2)
-                if not self.mount() or not self.is_accessible():
-                    self.logger.log("Failed to mount or remote directory is not accessible, skipping upload", log_level=1)
-                    return False
-
-            self.logger.log(f"Remote directory is accessible", log_level=5)
             self.upload(output_file, async_upload=False)
 
             # Verify upload success before deleting compressed file
@@ -243,12 +268,9 @@ class UploadManager:
             self.logger.log(f"Removing {output_file}", log_level=5)
             pathlib.Path(output_file).unlink(missing_ok=True)
 
-        # Delete original folder only after all checks pass
-        self.logger.log(f"Removing original folder {folder_name}", log_level=5)
-        subprocess.run(['rm', '-rf', '%s' % folder_name])
 
         # Upload remaining files
-        self.logger.log(f"Uploading remaining files in {folder_name}", log_level=5)
+        # self.logger.log(f"Uploading remaining files in {folder_name}", log_level=5)
         # get the parent parent folder name from the path of the compressed file
         abs_path = os.path.abspath(folder_name)
         parent_folder = os.path.dirname(abs_path)
