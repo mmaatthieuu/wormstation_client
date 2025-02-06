@@ -340,6 +340,9 @@ if __name__ == "__main__":
     if not EMAIL_USER or not EMAIL_PASSWORD:
         raise ValueError("Email credentials are missing. Please set them in environment variables or a .env file.")
 
+    # Print introduction message with timestamp
+    print(f"\n\n -------------------------- Starting Wormstation Monitor at {datetime.now()} --------------------------\n")
+
     # Initialize components
     email_client = EmailClient(EMAIL_USER, EMAIL_PASSWORD, recipient_list=config["recipient_list"])
     ignored_manager = IgnoredFoldersManager(config["ignored_folders_file"])
@@ -363,3 +366,5 @@ if __name__ == "__main__":
         print(f"Error: {e}")
     finally:
         email_client.disconnect_imap()
+
+        print(f"-------------------------- End of monitoring at {datetime.now()} --------------------------\n")
