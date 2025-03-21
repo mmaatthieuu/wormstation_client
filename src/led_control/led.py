@@ -92,12 +92,21 @@ class LED:
             if not self.running.is_set():
                 break
 
-    def wait_until_next_activation(self, period, offset):
+    def wait_until_next_activation(self, period, offset, increment_step=1):
         """Wait until the next activation of the LED based on the period and offset."""
         current_time = time.time()
         time_until_next_activation = (current_time - offset) % period
         remaining_time = period - time_until_next_activation
-        time.sleep(remaining_time)
+        self.logger.log(f'[{self.name} LED] Waiting for {remaining_time:.2f} seconds until next activation',
+                        log_level=6)
+
+        end_time = time.time() + remaining_time
+        while time.time() < end_time:
+            # Check if the pause_event is cleared, if so, break the loop
+            if not self.pause_event.is_set():
+                break
+            # Sleep in small increments to allow periodic checking of pause_event
+            time.sleep(min(increment_step, end_time - time.time()))
 
     def run_led_timer(self, duration, period, timeout, blinking=False, blinking_period=None):
         """
