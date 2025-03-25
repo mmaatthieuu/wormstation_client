@@ -74,6 +74,9 @@ class LED:
 
     def blink(self, total_duration, blink_on_duration, blink_period):
         """Blink the LED for a total duration."""
+        self.logger.log(f"[{self.name} LED] Blinking for {total_duration:.2f} seconds with {blink_on_duration:.2f},"
+                        f" period {blink_period:.2f}",
+                        log_level=6)
         end_time = time.time() + total_duration
         off_time = blink_period - blink_on_duration
 
@@ -92,7 +95,7 @@ class LED:
             if not self.running.is_set():
                 break
 
-    def wait_until_next_activation(self, period, offset, increment_step=1):
+    def wait_until_next_activation(self, period, offset, increment_step=10):
         """Wait until the next activation of the LED based on the period and offset."""
         current_time = time.time()
         time_until_next_activation = (current_time - offset) % period
@@ -104,9 +107,18 @@ class LED:
         while time.time() < end_time:
             # Check if the pause_event is cleared, if so, break the loop
             if not self.pause_event.is_set():
+                self.logger.log(f'[{self.name} LED] Paused during waiting. Interrupting wait.', log_level=6)
                 break
             # Sleep in small increments to allow periodic checking of pause_event
-            time.sleep(min(increment_step, end_time - time.time()))
+            waiting_time = min(increment_step, end_time - time.time())
+            self.logger.log(f'[{self.name} LED] Waiting for another {waiting_time:.2f} seconds',
+                            log_level=6)
+            time.sleep(waiting_time)
+
+        # If end_time is reached, log a message
+        if time.time() >= end_time:
+            self.logger.log(f'[{self.name} LED] Resuming after waiting for {remaining_time:.2f} seconds',
+                            log_level=6)
 
     def run_led_timer(self, duration, period, timeout, blinking=False, blinking_period=None):
         """
