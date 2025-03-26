@@ -119,6 +119,10 @@ class LED:
         if time.time() >= end_time:
             self.logger.log(f'[{self.name} LED] Resuming after waiting for {remaining_time:.2f} seconds',
                             log_level=6)
+            return True
+
+        return False
+
 
     def run_led_timer(self, duration, period, timeout, blinking=False, blinking_period=None):
         """
@@ -137,13 +141,13 @@ class LED:
             while time.time() < end_time and self.running.is_set():
                 self.pause_event.wait()  # Wait for the pause event to be set
                 if blinking:
-                    self.wait_until_next_activation(period, 0.5)
-                    if not self.running.is_set():
+                    wait_done = self.wait_until_next_activation(period, 0.5)
+                    if not self.running.is_set() or not wait_done:
                         break  # Exit early if requested
                     self.blink(duration, 1, blinking_period)
                 else:
-                    self.wait_until_next_activation(period, -0.25)
-                    if not self.running.is_set():
+                    wait_done = self.wait_until_next_activation(period, -0.25)
+                    if not self.running.is_set() or not wait_done:
                         break  # Exit early if requested
                     self.turn_on_for_n_sec(duration)
 
