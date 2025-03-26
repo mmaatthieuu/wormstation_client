@@ -142,14 +142,16 @@ class LED:
                 self.pause_event.wait()  # Wait for the pause event to be set
                 if blinking:
                     wait_done = self.wait_until_next_activation(period, 0.5)
-                    if not self.running.is_set() or not wait_done:
+                    if not self.running.is_set():
                         break  # Exit early if requested
-                    self.blink(duration, 1, blinking_period)
+                    if wait_done:
+                        self.blink(duration, 1, blinking_period)
                 else:
                     wait_done = self.wait_until_next_activation(period, -0.25)
-                    if not self.running.is_set() or not wait_done:
+                    if not self.running.is_set():
                         break  # Exit early if requested
-                    self.turn_on_for_n_sec(duration)
+                    if wait_done:
+                        self.turn_on_for_n_sec(duration)
 
         if self.program and self.program.is_alive():
             self.cleanup()
